@@ -8,7 +8,7 @@ export default function ChatPage() {
   const { user } = useAuth();
   const { rooms, ensureGeneralRoom } = useRooms();
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [time, setTime] = useState(new Date());
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     ensureGeneralRoom();
@@ -21,31 +21,38 @@ export default function ChatPage() {
     }
   }, [rooms, activeRoomId]);
 
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+  const handleSelectRoom = (id: string) => {
+    setActiveRoomId(id);
+    setShowChat(true);
+  };
+
+  const handleBack = () => {
+    setShowChat(false);
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-black font-mono overflow-hidden">
-      <div className="shrink-0 border-b border-green-900 bg-black/95 px-4 py-1.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-700/80"></div>
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-700/80"></div>
-            <div className="w-2.5 h-2.5 rounded-full bg-green-600/80"></div>
-          </div>
-          <span className="text-green-800 text-xs">termchat — bash — 200×50</span>
+    <div className="h-screen flex flex-col bg-[#050505] font-mono overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        <div className={`
+          absolute inset-0 md:relative md:w-64 md:shrink-0
+          transition-transform duration-200 ease-in-out z-10
+          ${showChat ? "-translate-x-full md:translate-x-0" : "translate-x-0"}
+        `}>
+          <Sidebar
+            activeRoomId={activeRoomId}
+            onSelectRoom={handleSelectRoom}
+          />
         </div>
-        <div className="flex items-center gap-4 text-xs text-green-800">
-          <span className="text-green-900">{time.toLocaleTimeString("en-US", { hour12: false })}</span>
-          <span className="text-green-700">{user?.email}</span>
+        <div className={`
+          absolute inset-0 md:relative md:flex-1
+          transition-transform duration-200 ease-in-out
+          ${showChat ? "translate-x-0" : "translate-x-full md:translate-x-0"}
+        `}>
+          <ChatArea
+            roomId={activeRoomId}
+            onBack={handleBack}
+          />
         </div>
-      </div>
-
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar activeRoomId={activeRoomId} onSelectRoom={setActiveRoomId} />
-        <ChatArea roomId={activeRoomId} />
       </div>
     </div>
   );
