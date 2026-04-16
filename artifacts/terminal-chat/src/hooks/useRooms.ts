@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   collection, onSnapshot, addDoc, doc, setDoc,
-  query, orderBy, serverTimestamp, Timestamp, getDoc,
+  query, serverTimestamp, Timestamp, getDoc,
   where, getDocs, updateDoc, arrayUnion
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -24,16 +24,23 @@ export function useRooms() {
 
   useEffect(() => {
     if (!user) return;
+    // No orderBy to avoid requiring a composite Firestore index
+    // We sort client-side instead
     const q = query(
       collection(db, "rooms"),
-      where("members", "array-contains", user.uid),
-      orderBy("lastMessageAt", "desc")
+      where("members", "array-contains", user.uid)
     );
     const unsub = onSnapshot(q, (snap) => {
       const list: Room[] = snap.docs.map((d) => ({
         id: d.id,
         ...(d.data() as Omit<Room, "id">),
       }));
+      // Sort client-side: rooms with recent messages first
+      list.sort((a, b) => {
+        const aTime = a.lastMessageAt?.toMillis() ?? a.createdAt?.toMillis() ?? 0;
+        const bTime = b.lastMessageAt?.toMillis() ?? b.createdAt?.toMillis() ?? 0;
+        return bTime - aTime;
+      });
       setRooms(list);
     });
     return unsub;

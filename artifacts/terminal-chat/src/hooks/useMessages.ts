@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export interface Message {
   id: string;
   text: string;
+  imageUrl?: string;
   uid: string;
   displayName: string;
   photoURL: string | null;
@@ -33,9 +34,11 @@ export function useMessages(roomId: string | null) {
     return unsub;
   }, [roomId]);
 
-  const sendMessage = async (text: string) => {
-    if (!roomId || !user || !text.trim()) return;
-    const msg = {
+  const sendMessage = async (text: string, imageUrl?: string) => {
+    if (!roomId || !user) return;
+    if (!text.trim() && !imageUrl) return;
+
+    const msg: Record<string, unknown> = {
       text: text.trim(),
       uid: user.uid,
       displayName: user.displayName ?? "Anonymous",
@@ -43,9 +46,11 @@ export function useMessages(roomId: string | null) {
       createdAt: serverTimestamp(),
       type: "message",
     };
+    if (imageUrl) msg.imageUrl = imageUrl;
+
     await addDoc(collection(db, "rooms", roomId, "messages"), msg);
     await updateDoc(doc(db, "rooms", roomId), {
-      lastMessage: text.trim().slice(0, 80),
+      lastMessage: imageUrl ? "📷 Photo" : text.trim().slice(0, 80),
       lastMessageAt: serverTimestamp(),
     });
   };

@@ -3,6 +3,7 @@ import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRooms, Room } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
+import { uploadImageToImgbb } from "@/lib/imgbb";
 import Avatar from "./Avatar";
 
 interface ChatAreaProps {
@@ -17,8 +18,11 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
   const { messages, sendMessage } = useMessages(roomId);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const room: Room | undefined = rooms.find((r) => r.id === roomId);
 
@@ -40,14 +44,40 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || sending) return;
+    if ((!input.trim() && !previewImage) || sending) return;
     const text = input;
+    const imgUrl = previewImage;
     setInput("");
+    setPreviewImage(null);
     setSending(true);
-    await sendMessage(text);
+    await sendMessage(text, imgUrl ?? undefined);
     setSending(false);
     inputRef.current?.focus();
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so same file can be selected again
+    e.target.value = "";
+
+    // Validate size (max 32MB for imgbb)
+    if (file.size > 32 * 1024 * 1024) {
+      alert("Image must be smaller than 32MB");
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const url = await uploadImageToImgbb(file);
+      setPreviewImage(url);
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const formatTime = (ts: { toDate: () => Date } | null) => {
@@ -70,7 +100,7 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-center px-6">
         <div className="w-20 h-20 rounded-full bg-green-900/20 border border-green-900/50 flex items-center justify-center mb-4">
-          <span className="text-green-600 text-3xl font-bold">TC</span>
+          <span className="text-green-600 text-3xl font-bold font-mono">TC</span>
         </div>
         <h2 className="text-green-400 font-bold text-lg mb-2">TermChat</h2>
         <p className="text-green-800 text-sm">Select a conversation to start messaging</p>
@@ -100,7 +130,7 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
           </div>
         ) : (
           <div className="w-8 h-8 rounded-full bg-green-900/40 border border-green-800/50 flex items-center justify-center shrink-0">
-            <span className="text-green-500 font-bold text-sm">#</span>
+            <span className="text-green-500 font-bold text-sm font-mono">#</span>
           </div>
         )}
 
@@ -130,9 +160,11 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
           const prev = messages[i - 1];
           const next = messages[i + 1];
           const isGroupStart = !prev || prev.uid !== msg.uid ||
-            (msg.createdAt && prev.createdAt && msg.createdAt.toDate().getTime() - prev.createdAt.toDate().getTime() > 120000);
+            (msg.createdAt && prev.createdAt &&
+              msg.createdAt.toDate().getTime() - prev.createdAt.toDate().getTime() > 120000);
           const isGroupEnd = !next || next.uid !== msg.uid ||
-            (msg.createdAt && next.createdAt && next.createdAt.toDate().getTime() - msg.createdAt.toDate().getTime() > 120000);
+            (msg.createdAt && next.createdAt &&
+              next.createdAt.toDate().getTime() - msg.createdAt.toDate().getTime() > 120000);
 
           const dateLabel = formatDateLabel(msg.createdAt);
           const showDate = dateLabel !== lastDateLabel;
@@ -149,12 +181,10 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
               )}
 
               <div className={`flex items-end gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"} ${isGroupStart ? "mt-3" : "mt-0.5"}`}>
-                {/* Avatar — only for others, only at group end */}
+                {/* Avatar for others in group chats */}
                 {!isOwn && room?.type === "group" && (
                   <div className="w-7 shrink-0 mb-1">
-                    {isGroupEnd ? (
-                      <Avatar name={msg.displayName} photoURL={msg.photoURL} size="sm" />
-                    ) : null}
+                    {isGroupEnd ? <Avatar name={msg.displayName} photoURL={msg.photoURL} size="sm" /> : null}
                   </div>
                 )}
 
@@ -162,15 +192,35 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
                   {isGroupStart && !isOwn && room?.type === "group" && (
                     <span className="text-green-700 text-xs font-semibold mb-1 ml-1">{msg.displayName}</span>
                   )}
-                  <div className={`
-                    px-3.5 py-2.5 text-sm leading-relaxed break-words
-                    ${isOwn
-                      ? `bg-green-800/50 text-green-100 ${isGroupStart ? "rounded-t-2xl" : ""} ${isGroupEnd ? "rounded-bl-2xl rounded-br-sm" : ""} ${!isGroupStart && !isGroupEnd ? "rounded-l-2xl rounded-r-sm" : ""} ${isGroupStart && isGroupEnd ? "rounded-2xl rounded-br-sm" : ""}`
-                      : `bg-[#1a1a1a] text-green-200 border border-white/5 ${isGroupStart ? "rounded-t-2xl" : ""} ${isGroupEnd ? "rounded-br-2xl rounded-bl-sm" : ""} ${!isGroupStart && !isGroupEnd ? "rounded-r-2xl rounded-l-sm" : ""} ${isGroupStart && isGroupEnd ? "rounded-2xl rounded-bl-sm" : ""}`
-                    }
-                  `}>
-                    {msg.text}
-                  </div>
+
+                  {/* Image message */}
+                  {msg.imageUrl && (
+                    <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block mb-1">
+                      <img
+                        src={msg.imageUrl}
+                        alt="Sent image"
+                        className={`max-w-[260px] max-h-[320px] object-cover rounded-2xl border border-white/8 ${
+                          isOwn ? "rounded-br-sm" : "rounded-bl-sm"
+                        }`}
+                        loading="lazy"
+                      />
+                    </a>
+                  )}
+
+                  {/* Text message */}
+                  {msg.text && (
+                    <div className={`
+                      px-3.5 py-2.5 text-sm leading-relaxed break-words
+                      ${isOwn
+                        ? `bg-green-800/50 text-green-100 rounded-t-2xl rounded-bl-2xl rounded-br-sm`
+                        : `bg-[#1a1a1a] text-green-200 border border-white/5 rounded-t-2xl rounded-br-2xl rounded-bl-sm`
+                      }
+                      ${isGroupStart && isGroupEnd ? "" : ""}
+                    `}>
+                      {msg.text}
+                    </div>
+                  )}
+
                   {isGroupEnd && (
                     <span className="text-green-900 text-[10px] mt-1 mx-1">{formatTime(msg.createdAt)}</span>
                   )}
@@ -182,10 +232,51 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
         <div ref={bottomRef} className="h-2" />
       </div>
 
+      {/* Image preview bar */}
+      {previewImage && (
+        <div className="px-4 py-2 bg-[#0f0f0f] border-t border-white/5 flex items-center gap-3">
+          <div className="relative">
+            <img src={previewImage} alt="Preview" className="h-16 w-16 object-cover rounded-xl border border-white/10" />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-900 text-red-300 flex items-center justify-center text-xs font-bold hover:bg-red-700 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+          <span className="text-green-800 text-xs">Image ready to send</span>
+        </div>
+      )}
+
       {/* Input */}
       <div className="px-3 py-3 pb-6 bg-[#0f0f0f] border-t border-white/5 shrink-0">
         <form onSubmit={handleSend} className="flex items-center gap-2">
           <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
+
+          {/* Image upload button */}
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploadingImage}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-green-800 hover:text-green-500 bg-white/5 hover:bg-white/8 transition-all active:scale-95 disabled:opacity-50 shrink-0"
+          >
+            {uploadingImage ? (
+              <span className="w-4 h-4 border-2 border-green-900 border-t-green-500 rounded-full animate-spin"></span>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            )}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageSelect}
+          />
+
+          {/* Text input */}
           <div className="flex-1 flex items-center bg-white/5 border border-white/8 rounded-full px-4 py-2.5">
             <input
               ref={inputRef}
@@ -193,17 +284,19 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={sending}
-              placeholder="Message..."
+              placeholder={previewImage ? "Add a caption..." : "Message..."}
               className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-sm font-mono min-w-0"
               autoComplete="off"
               autoCapitalize="sentences"
             />
           </div>
+
+          {/* Send button */}
           <button
             type="submit"
-            disabled={!input.trim() || sending}
+            disabled={(!input.trim() && !previewImage) || sending || uploadingImage}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 shrink-0 ${
-              input.trim() && !sending
+              (input.trim() || previewImage) && !sending && !uploadingImage
                 ? "bg-green-600 text-black hover:bg-green-500"
                 : "bg-white/5 text-green-900"
             }`}
