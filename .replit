@@ -55,3 +55,10 @@ externalPort = 80
 [[ports]]
 localPort = 23280
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BPbbhMVQS_8hYKacfWhmpOfKUr_5WD4eiDuMzw651He-Ymb1OEWFvWfaT1IGCK80QSOFv2mFDFncemPsULUPC1w"
+VAPID_PRIVATE_KEY = "WlXGlPXFDNDMQau_aju93FvptbBJU6qRLoYVafpiIZU"
+VAPID_EMAIL = "mailto:termchat@example.com"

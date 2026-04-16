@@ -1,4 +1,4 @@
-const CACHE_NAME = "termchat-v1";
+const CACHE_NAME = "termchat-v2";
 const STATIC_ASSETS = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
@@ -23,5 +23,38 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request).catch(() =>
       caches.match(event.request).then((r) => r ?? new Response("Offline"))
     )
+  );
+});
+
+// ── Push Notifications ──────────────────────────────────────────────────────
+
+self.addEventListener("push", (event) => {
+  let data = { title: "TermChat", body: "رسالة جديدة", icon: "/icon-192.png", tag: "termchat-msg" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch (_) {}
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon ?? "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: data.tag ?? "termchat-msg",
+      renotify: true,
+      vibrate: [200, 100, 200],
+      data: data.data ?? {},
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow("/");
+    })
   );
 });

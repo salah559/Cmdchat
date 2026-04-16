@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRooms, Room } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
 import { useTyping } from "@/hooks/useTyping";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { uploadImageToImgbb } from "@/lib/imgbb";
 import { playMessageSound, playSentSound, isSoundEnabled } from "@/lib/sounds";
 import Avatar from "./Avatar";
@@ -24,6 +25,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const users = useUsers();
   const { messages, sendMessage, toggleReaction, markRead } = useMessages(roomId);
   const { typingUsers, setTyping, clearTyping } = useTyping(roomId);
+  const { notifyMembers } = usePushNotifications();
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -113,6 +115,17 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     await clearTyping();
     if (isSoundEnabled()) playSentSound();
     await sendMessage(text, imgUrl ?? undefined, reply ?? undefined);
+
+    if (room && room.members.length > 1) {
+      const senderName = user?.displayName ?? "شخص ما";
+      const bodyText = imgUrl ? "📷 صورة" : (text.trim().slice(0, 80) || "رسالة");
+      notifyMembers(room.members, {
+        title: room.type === "dm" ? senderName : `${senderName} في ${roomTitle}`,
+        body: bodyText,
+        tag: `room-${roomId}`,
+      });
+    }
+
     setSending(false);
     inputRef.current?.focus();
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
