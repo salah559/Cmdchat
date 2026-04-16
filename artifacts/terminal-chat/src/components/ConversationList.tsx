@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRooms, Room } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
+import { useUnread } from "@/hooks/useUnread";
+import { useTheme } from "@/contexts/ThemeContext";
+import { isSoundEnabled, toggleSound } from "@/lib/sounds";
 import CreateGroupModal from "./CreateGroupModal";
 import ProfileModal from "./ProfileModal";
 import Avatar from "./Avatar";
@@ -17,11 +20,14 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const { user, logout } = useAuth();
   const { rooms, openDM } = useRooms();
   const users = useUsers();
+  const { markRead, isUnread } = useUnread();
+  const { isDark, toggleTheme } = useTheme();
   const [tab, setTab] = useState<Tab>("channels");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [dmLoadingUid, setDmLoadingUid] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [profileUid, setProfileUid] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(isSoundEnabled());
 
   const groupRooms = rooms.filter((r) => r.type === "group");
   const dmRooms = rooms.filter((r) => r.type === "dm");
@@ -30,12 +36,25 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
 
   const safeTop = "env(safe-area-inset-top, 44px)";
 
+  const handleSelectRoom = (roomId: string) => {
+    markRead(roomId);
+    onSelectRoom(roomId);
+  };
+
   const handleDM = async (uid: string) => {
     if (dmLoadingUid) return;
     setDmLoadingUid(uid);
     const roomId = await openDM(uid);
     setDmLoadingUid(null);
-    if (roomId) onSelectRoom(roomId);
+    if (roomId) {
+      markRead(roomId);
+      onSelectRoom(roomId);
+    }
+  };
+
+  const handleToggleSound = () => {
+    const next = toggleSound();
+    setSoundOn(next);
   };
 
   const getDMUser = (room: Room) => {
@@ -50,6 +69,17 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
     if (d.toDateString() === now.toDateString())
       return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const formatLastSeen = (ts: { toDate: () => Date } | null): string => {
+    if (!ts) return "Offline";
+    const diff = Date.now() - ts.toDate().getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const filteredGroups = groupRooms.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()));
@@ -68,6 +98,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
         </svg>
       ),
+      badge: groupRooms.filter((r) => isUnread(r.id, r.lastMessageAt)).length || undefined,
     },
     {
       key: "dms",
@@ -77,7 +108,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       ),
-      badge: dmRooms.length > 0 ? dmRooms.length : undefined,
+      badge: dmRooms.filter((r) => isUnread(r.id, r.lastMessageAt)).length || undefined,
     },
     {
       key: "users",
@@ -101,37 +132,73 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
           style={{ paddingTop: `calc(${safeTop} + 8px)` }}
         >
           <div className="flex items-center justify-between mb-3">
-            {/* Current user */}
             <button
               onClick={() => setProfileUid(user!.uid)}
               className="flex items-center gap-2.5 active:opacity-70 transition-opacity min-w-0"
             >
               <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
               <div className="text-left min-w-0">
-                <p className="text-green-300 font-semibold text-sm leading-tight truncate max-w-[140px]">{user?.displayName}</p>
+                <p className="text-green-300 font-semibold text-sm leading-tight truncate max-w-[120px]">{user?.displayName}</p>
                 <p className="text-green-600 text-xs">● Online</p>
               </div>
             </button>
 
-            {/* Actions */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Sound toggle */}
+              <button
+                onClick={handleToggleSound}
+                title={soundOn ? "Mute sounds" : "Unmute sounds"}
+                className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
+              >
+                {soundOn ? (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-9.536a5 5 0 000 7.072M5 9l4-4v14l-4-4H2V9h3z" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Theme toggle */}
+              <button
+                onClick={toggleTheme}
+                title={isDark ? "Light mode" : "Dark mode"}
+                className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
+              >
+                {isDark ? (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+
+              {/* New channel */}
               {tab === "channels" && (
                 <button
                   onClick={() => setShowCreateGroup(true)}
                   title="New channel"
-                  className="w-9 h-9 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
+                  className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 </button>
               )}
+
+              {/* Logout */}
               <button
                 onClick={logout}
                 title="Sign out"
-                className="w-9 h-9 flex items-center justify-center text-red-900 hover:text-red-500 border border-red-900/30 hover:border-red-800/50 rounded-xl transition-all active:scale-95"
+                className="w-8 h-8 flex items-center justify-center text-red-900 hover:text-red-500 border border-red-900/30 hover:border-red-800/50 rounded-xl transition-all active:scale-95"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
               </button>
@@ -207,26 +274,32 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                   </button>
                 </div>
               ) : (
-                filteredGroups.map((room) => (
-                  <button
-                    key={room.id}
-                    onClick={() => onSelectRoom(room.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/3 transition-colors active:bg-green-950/20 ${
-                      activeRoomId === room.id ? "bg-green-950/15 border-l-2 border-l-green-600" : ""
-                    }`}
-                  >
-                    <div className="w-11 h-11 rounded-2xl bg-green-900/25 border border-green-800/30 flex items-center justify-center shrink-0">
-                      <span className="text-green-600 font-bold text-lg font-mono">#</span>
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-green-300 font-semibold text-sm truncate">{room.name}</span>
-                        <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
+                filteredGroups.map((room) => {
+                  const unread = isUnread(room.id, room.lastMessageAt) && room.id !== activeRoomId;
+                  return (
+                    <button
+                      key={room.id}
+                      onClick={() => handleSelectRoom(room.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/3 transition-colors active:bg-green-950/20 ${
+                        activeRoomId === room.id ? "bg-green-950/15 border-l-2 border-l-green-600" : ""
+                      }`}
+                    >
+                      <div className="w-11 h-11 rounded-2xl bg-green-900/25 border border-green-800/30 flex items-center justify-center shrink-0 relative">
+                        <span className="text-green-600 font-bold text-lg font-mono">#</span>
+                        {unread && (
+                          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-500 border-2 border-[#0a0a0a]" />
+                        )}
                       </div>
-                      <div className="text-green-800 text-xs truncate mt-0.5">{room.lastMessage || "No messages yet"}</div>
-                    </div>
-                  </button>
-                ))
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{room.name}</span>
+                          <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
+                        </div>
+                        <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>{room.lastMessage || "No messages yet"}</div>
+                      </div>
+                    </button>
+                  );
+                })
               )}
             </div>
           )}
@@ -247,10 +320,11 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               ) : (
                 filteredDMs.map((room) => {
                   const other = getDMUser(room);
+                  const unread = isUnread(room.id, room.lastMessageAt) && room.id !== activeRoomId;
                   return (
                     <button
                       key={room.id}
-                      onClick={() => onSelectRoom(room.id)}
+                      onClick={() => handleSelectRoom(room.id)}
                       className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/3 transition-colors active:bg-green-950/20 ${
                         activeRoomId === room.id ? "bg-green-950/15 border-l-2 border-l-green-600" : ""
                       }`}
@@ -262,13 +336,23 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                             other?.status === "online" ? "bg-green-500" : "bg-gray-700"
                           }`}
                         />
+                        {unread && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-[#0a0a0a]" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-green-300 font-semibold text-sm truncate">{other?.displayName ?? "Unknown"}</span>
+                          <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{other?.displayName ?? "Unknown"}</span>
                           <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
                         </div>
-                        <div className="text-green-800 text-xs truncate mt-0.5">{room.lastMessage || "Start a conversation"}</div>
+                        <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>
+                          {room.lastMessage || "Start a conversation"}
+                        </div>
+                        {other?.status !== "online" && other?.lastSeen && (
+                          <div className="text-green-900 text-[10px] mt-0.5">
+                            Last seen {formatLastSeen(other.lastSeen)}
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
@@ -286,17 +370,11 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               </div>
               {filteredUsers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-green-900 px-6 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-green-900/20 border border-green-900/30 flex items-center justify-center mb-4">
-                    <svg className="w-7 h-7 text-green-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
                   <p className="text-sm font-medium text-green-800">No other users yet</p>
                 </div>
               ) : (
                 filteredUsers.map((u) => (
                   <div key={u.uid} className="flex items-center gap-3 px-4 py-3.5 border-b border-white/3">
-                    {/* Avatar — open profile */}
                     <button onClick={() => setProfileUid(u.uid)} className="relative shrink-0 active:opacity-70 transition-opacity">
                       <Avatar name={u.displayName} photoURL={u.photoURL} size="md" />
                       <span
@@ -306,15 +384,13 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                       />
                     </button>
 
-                    {/* Name — open profile */}
                     <button onClick={() => setProfileUid(u.uid)} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
                       <div className="text-green-300 font-semibold text-sm truncate">{u.displayName}</div>
                       <div className={`text-xs mt-0.5 ${u.status === "online" ? "text-green-600" : "text-green-900"}`}>
-                        {u.status === "online" ? "● Online" : "○ Offline"}
+                        {u.status === "online" ? "● Online" : `○ ${formatLastSeen(u.lastSeen)}`}
                       </div>
                     </button>
 
-                    {/* Message button */}
                     <button
                       onClick={() => handleDM(u.uid)}
                       disabled={!!dmLoadingUid}
@@ -340,7 +416,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
       {showCreateGroup && (
         <CreateGroupModal
           onClose={() => setShowCreateGroup(false)}
-          onCreated={(id) => { setShowCreateGroup(false); onSelectRoom(id); }}
+          onCreated={(id) => { setShowCreateGroup(false); handleSelectRoom(id); }}
         />
       )}
 
@@ -351,7 +427,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
           onSendMessage={async (uid) => {
             setProfileUid(null);
             const roomId = await openDM(uid);
-            if (roomId) onSelectRoom(roomId);
+            if (roomId) handleSelectRoom(roomId);
           }}
         />
       )}

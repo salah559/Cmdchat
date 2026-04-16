@@ -1,6 +1,7 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import LoginPage from "@/pages/LoginPage";
 import ChatPage from "@/pages/ChatPage";
 
@@ -11,9 +12,9 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-green-400 font-mono flex items-center justify-center">
+      <div className="min-h-screen bg-app flex items-center justify-center">
         <div className="text-center space-y-2">
-          <div className="text-sm animate-pulse">Booting system...</div>
+          <div className="text-sm animate-pulse text-green-400">Booting system...</div>
           <div className="text-green-700 text-xs">█████████░░ 90%</div>
         </div>
       </div>
@@ -38,13 +39,15 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

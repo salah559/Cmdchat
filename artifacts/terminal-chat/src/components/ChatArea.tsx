@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { useMessages } from "@/hooks/useMessages";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useMessages, ReplyInfo } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRooms, Room } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
+import { useTyping } from "@/hooks/useTyping";
 import { uploadImageToImgbb } from "@/lib/imgbb";
+import { playMessageSound, playSentSound, isSoundEnabled } from "@/lib/sounds";
 import Avatar from "./Avatar";
 import ProfileModal from "./ProfileModal";
 
@@ -14,11 +16,15 @@ interface ChatAreaProps {
   showBack?: boolean;
 }
 
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🎉"];
+
 export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = false }: ChatAreaProps) {
   const { user } = useAuth();
   const { rooms, openDM, deleteRoom } = useRooms();
   const users = useUsers();
-  const { messages, sendMessage } = useMessages(roomId);
+  const { messages, sendMessage, toggleReaction, markRead } = useMessages(roomId);
+  const { typingUsers, setTyping, clearTyping } = useTyping(roomId);
+
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -26,9 +32,17 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const [profileUid, setProfileUid] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [replyTo, setReplyTo] = useState<ReplyInfo | null>(null);
+  const [reactionTarget, setReactionTarget] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevMsgCount = useRef(0);
 
   const room: Room | undefined = rooms.find((r) => r.id === roomId);
   const isGroupCreator = room?.type === "group" && room.createdBy === user?.uid;
@@ -45,26 +59,68 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     return otherUser?.displayName ?? "DM";
   })();
 
+  // Scroll to bottom on room change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [roomId]);
 
+  // Scroll to bottom + sound on new messages
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > prevMsgCount.current) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.uid !== user?.uid && isSoundEnabled() && prevMsgCount.current > 0) {
+        playMessageSound();
+      }
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      // Mark last message as read
+      if (lastMsg && lastMsg.uid !== user?.uid && roomId) {
+        markRead(lastMsg.id);
+      }
+    }
+    prevMsgCount.current = messages.length;
   }, [messages.length]);
+
+  // Close reaction picker on outside tap
+  useEffect(() => {
+    if (!reactionTarget) return;
+    const handler = () => setReactionTarget(null);
+    setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => document.removeEventListener("click", handler);
+  }, [reactionTarget]);
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (searchOpen) setTimeout(() => searchRef.current?.focus(), 100);
+  }, [searchOpen]);
+
+  const filteredMessages = searchQuery.trim()
+    ? messages.filter((m) =>
+        m.text?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : messages;
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && !previewImage) || sending) return;
     const text = input;
     const imgUrl = previewImage;
+    const reply = replyTo;
     setInput("");
     setPreviewImage(null);
+    setReplyTo(null);
     setSending(true);
-    await sendMessage(text, imgUrl ?? undefined);
+    await clearTyping();
+    if (isSoundEnabled()) playSentSound();
+    await sendMessage(text, imgUrl ?? undefined, reply ?? undefined);
     setSending(false);
     inputRef.current?.focus();
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+    if (e.target.value.trim()) setTyping();
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,13 +148,22 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     onRoomDeleted();
   };
 
-  const handleOpenProfile = (uid: string) => setProfileUid(uid);
+  const handleLongPressStart = useCallback((msgId: string) => {
+    longPressTimer.current = setTimeout(() => {
+      setReactionTarget(msgId);
+    }, 450);
+  }, []);
 
-  const handleSendMessageFromProfile = async (uid: string) => {
-    const roomId = await openDM(uid);
-    if (roomId) {
-      setProfileUid(null);
+  const handleLongPressEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
+  }, []);
+
+  const handleReply = (msg: { id: string; text: string; displayName: string; imageUrl?: string }) => {
+    setReplyTo({ id: msg.id, text: msg.text, displayName: msg.displayName, imageUrl: msg.imageUrl });
+    inputRef.current?.focus();
   };
 
   const formatTime = (ts: { toDate: () => Date } | null) => {
@@ -138,27 +203,33 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   }
 
   let lastDateLabel = "";
+  const ownMessages = messages.filter((m) => m.uid === user?.uid);
+  const lastOwnMsg = ownMessages[ownMessages.length - 1];
+  const isLastOwnRead = lastOwnMsg?.readBy
+    ? lastOwnMsg.readBy.some((uid) => uid !== user?.uid)
+    : false;
 
   return (
     <>
       <div className="h-full flex flex-col bg-[#0a0a0a] overflow-hidden">
-        {/* Header — uses safe-area-inset-top */}
+        {/* Header */}
         <div
           className="bg-[#0f0f0f] border-b border-white/5 flex items-center gap-3 px-3 pb-3 shrink-0"
           style={{ paddingTop: `calc(${safeTop} + 8px)` }}
         >
-          <button
-            onClick={onBack}
-            className={`${showBack ? "flex" : "hidden"} p-2 -ml-1 text-green-600 hover:text-green-400 active:scale-95 transition-all shrink-0 items-center justify-center`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+          {showBack && (
+            <button
+              onClick={onBack}
+              className="flex p-2 -ml-1 text-green-600 hover:text-green-400 active:scale-95 transition-all shrink-0 items-center justify-center"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
 
-          {/* Avatar — click to view profile */}
           <button
-            onClick={() => handleOpenProfile(room?.type === "dm" && otherUser ? otherUser.uid : user!.uid)}
+            onClick={() => room?.type === "dm" && otherUser ? setProfileUid(otherUser.uid) : setProfileUid(user!.uid)}
             className="relative shrink-0 active:opacity-70 transition-opacity"
           >
             {room?.type === "dm" && otherUser ? (
@@ -173,9 +244,8 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             )}
           </button>
 
-          {/* Title — click to view profile (DM) */}
           <button
-            onClick={() => room?.type === "dm" && otherUser ? handleOpenProfile(otherUser.uid) : undefined}
+            onClick={() => room?.type === "dm" && otherUser ? setProfileUid(otherUser.uid) : undefined}
             className={`flex-1 min-w-0 text-left ${room?.type === "dm" ? "active:opacity-70" : ""}`}
           >
             <div className="text-green-300 font-semibold text-sm truncate">
@@ -190,7 +260,16 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             ) : null}
           </button>
 
-          {/* Delete button — only for group creators */}
+          {/* Search toggle */}
+          <button
+            onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(""); }}
+            className={`p-2 transition-all active:scale-95 shrink-0 ${searchOpen ? "text-green-400" : "text-green-800 hover:text-green-500"}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
           {isGroupCreator && room.name !== "general" && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
@@ -203,29 +282,74 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           )}
         </div>
 
+        {/* Search bar */}
+        {searchOpen && (
+          <div className="bg-[#0f0f0f] border-b border-white/5 px-3 py-2 flex items-center gap-2 shrink-0">
+            <svg className="w-4 h-4 text-green-800 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              ref={searchRef}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search messages..."
+              className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-800 text-sm"
+            />
+            {searchQuery && (
+              <span className="text-green-900 text-xs shrink-0">{filteredMessages.length} result{filteredMessages.length !== 1 ? "s" : ""}</span>
+            )}
+            <button onClick={() => { setSearchOpen(false); setSearchQuery(""); }} className="text-green-800 hover:text-green-500 transition-colors shrink-0">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
-          {messages.length === 0 && (
+          {filteredMessages.length === 0 && !searchQuery && (
             <div className="flex flex-col items-center justify-center h-full text-green-900 text-sm py-10">
               <p>No messages yet</p>
               <p className="text-xs mt-1">Send the first message!</p>
             </div>
           )}
+          {filteredMessages.length === 0 && searchQuery && (
+            <div className="flex flex-col items-center justify-center h-full text-green-900 text-sm py-10">
+              <p>No messages found for "{searchQuery}"</p>
+            </div>
+          )}
 
-          {messages.map((msg, i) => {
+          {filteredMessages.map((msg, i) => {
             const isOwn = msg.uid === user?.uid;
-            const prev = messages[i - 1];
-            const next = messages[i + 1];
+            const prev = filteredMessages[i - 1];
+            const next = filteredMessages[i + 1];
             const isGroupStart = !prev || prev.uid !== msg.uid ||
               (msg.createdAt && prev.createdAt &&
                 msg.createdAt.toDate().getTime() - prev.createdAt.toDate().getTime() > 120000);
             const isGroupEnd = !next || next.uid !== msg.uid ||
               (msg.createdAt && next.createdAt &&
                 next.createdAt.toDate().getTime() - msg.createdAt.toDate().getTime() > 120000);
+            const isLastOwnInChat = msg.id === lastOwnMsg?.id;
 
             const dateLabel = formatDateLabel(msg.createdAt);
             const showDate = dateLabel !== lastDateLabel;
             if (showDate) lastDateLabel = dateLabel;
+
+            const hasReactions = msg.reactions && Object.values(msg.reactions).some((arr) => arr.length > 0);
+            const showReactionPicker = reactionTarget === msg.id;
+
+            // Highlight search terms
+            const renderText = (text: string) => {
+              if (!searchQuery.trim()) return text;
+              const parts = text.split(new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
+              return parts.map((part, idx) =>
+                part.toLowerCase() === searchQuery.toLowerCase()
+                  ? <mark key={idx} className="bg-green-600/40 text-green-200 rounded px-0.5">{part}</mark>
+                  : part
+              );
+            };
 
             return (
               <div key={msg.id}>
@@ -237,26 +361,41 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                   </div>
                 )}
 
-                <div className={`flex items-end gap-1.5 ${isOwn ? "flex-row-reverse" : "flex-row"} ${isGroupStart ? "mt-3" : "mt-0.5"}`}>
-                  {/* Other user avatar in group */}
+                <div
+                  className={`flex items-end gap-1.5 ${isOwn ? "flex-row-reverse" : "flex-row"} ${isGroupStart ? "mt-3" : "mt-0.5"}`}
+                  onPointerDown={() => handleLongPressStart(msg.id)}
+                  onPointerUp={handleLongPressEnd}
+                  onPointerLeave={handleLongPressEnd}
+                >
+                  {/* Avatar in group */}
                   {!isOwn && room?.type === "group" && (
                     <div className="w-7 shrink-0 self-end mb-1">
                       {isGroupEnd ? (
-                        <button onClick={() => handleOpenProfile(msg.uid)} className="active:opacity-70">
+                        <button onClick={() => setProfileUid(msg.uid)} className="active:opacity-70">
                           <Avatar name={msg.displayName} photoURL={msg.photoURL} size="sm" />
                         </button>
                       ) : null}
                     </div>
                   )}
 
-                  <div className={`flex flex-col ${isOwn ? "items-end" : "items-start"} max-w-[78%]`}>
+                  <div className={`flex flex-col ${isOwn ? "items-end" : "items-start"} max-w-[78%] relative group`}>
                     {isGroupStart && !isOwn && room?.type === "group" && (
                       <button
-                        onClick={() => handleOpenProfile(msg.uid)}
+                        onClick={() => setProfileUid(msg.uid)}
                         className="text-green-700 text-xs font-semibold mb-1 ml-1 active:opacity-70"
                       >
                         {msg.displayName}
                       </button>
+                    )}
+
+                    {/* Reply preview (in message) */}
+                    {msg.replyTo && (
+                      <div className={`mb-1 px-2.5 py-1.5 rounded-xl border-l-2 border-green-600 bg-green-900/20 max-w-full ${isOwn ? "items-end" : "items-start"}`}>
+                        <div className="text-green-600 text-[10px] font-semibold truncate">{msg.replyTo.displayName}</div>
+                        <div className="text-green-800 text-xs truncate">
+                          {msg.replyTo.imageUrl ? "📷 Photo" : msg.replyTo.text}
+                        </div>
+                      </div>
                     )}
 
                     {/* Image */}
@@ -278,18 +417,91 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                           ? "bg-green-800/50 text-green-100 rounded-br-sm"
                           : "bg-[#1c1c1c] text-green-200 border border-white/5 rounded-bl-sm"
                       }`}>
-                        {msg.text}
+                        {renderText(msg.text)}
                       </div>
                     )}
 
+                    {/* Reactions display */}
+                    {hasReactions && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {Object.entries(msg.reactions ?? {}).map(([emoji, uids]) =>
+                          uids.length > 0 ? (
+                            <button
+                              key={emoji}
+                              onClick={() => toggleReaction(msg.id, emoji)}
+                              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-all active:scale-95 ${
+                                uids.includes(user?.uid ?? "")
+                                  ? "bg-green-800/40 border-green-700/60 text-green-300"
+                                  : "bg-white/5 border-white/10 text-green-700"
+                              }`}
+                            >
+                              <span>{emoji}</span>
+                              <span className="text-[10px] font-semibold">{uids.length}</span>
+                            </button>
+                          ) : null
+                        )}
+                      </div>
+                    )}
+
+                    {/* Time + Reply button + Read receipts */}
                     {isGroupEnd && (
-                      <span className="text-green-900 text-[10px] mt-1 mx-1">{formatTime(msg.createdAt)}</span>
+                      <div className={`flex items-center gap-2 mt-1 mx-1 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+                        <span className="text-green-900 text-[10px]">{formatTime(msg.createdAt)}</span>
+                        {/* Read receipt for DM last own message */}
+                        {isOwn && room?.type === "dm" && isLastOwnInChat && (
+                          <span className={`text-[10px] font-bold ${isLastOwnRead ? "text-green-500" : "text-green-900"}`}>
+                            {isLastOwnRead ? "✓✓" : "✓"}
+                          </span>
+                        )}
+                        {/* Reply button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleReply(msg); }}
+                          className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Reaction picker (long press) */}
+                    {showReactionPicker && (
+                      <div
+                        className={`absolute ${isOwn ? "right-0" : "left-0"} -top-12 z-40 flex items-center gap-1 bg-[#1c1c1c] border border-white/10 rounded-2xl px-2 py-1.5 shadow-xl reaction-pop`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {QUICK_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            onClick={() => { toggleReaction(msg.id, emoji); setReactionTarget(null); }}
+                            className="w-8 h-8 flex items-center justify-center text-lg hover:scale-125 transition-transform active:scale-95"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
             );
           })}
+
+          {/* Typing indicator */}
+          {typingUsers.length > 0 && (
+            <div className="flex items-center gap-2 mt-3 ml-1">
+              <div className="flex items-center gap-1 bg-[#1c1c1c] border border-white/5 rounded-2xl rounded-bl-sm px-3 py-2">
+                <span className="text-green-700 text-xs mr-1">
+                  {typingUsers.length === 1 ? typingUsers[0] : `${typingUsers.length} people`} typing
+                </span>
+                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-green-600 inline-block" />
+                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-green-600 inline-block" />
+                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-green-600 inline-block" />
+              </div>
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
 
@@ -309,7 +521,28 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           </div>
         )}
 
-        {/* Input bar — safe area bottom padding */}
+        {/* Reply preview bar */}
+        {replyTo && (
+          <div className="px-4 py-2 bg-[#0f0f0f] border-t border-white/5 flex items-center gap-3 shrink-0">
+            <div className="w-0.5 h-8 bg-green-600 rounded-full shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-green-600 text-[10px] font-semibold">{replyTo.displayName}</div>
+              <div className="text-green-800 text-xs truncate">
+                {replyTo.imageUrl ? "📷 Photo" : replyTo.text}
+              </div>
+            </div>
+            <button
+              onClick={() => setReplyTo(null)}
+              className="text-green-900 hover:text-green-600 transition-colors shrink-0 active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Input bar */}
         <div
           className="bg-[#0f0f0f] border-t border-white/5 px-3 pt-2 shrink-0"
           style={{ paddingBottom: `calc(${safeBottom} + 8px)` }}
@@ -317,13 +550,12 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           <form onSubmit={handleSend} className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => handleOpenProfile(user!.uid)}
+              onClick={() => setProfileUid(user!.uid)}
               className="shrink-0 active:opacity-70 transition-opacity"
             >
               <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
             </button>
 
-            {/* Image button */}
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -340,15 +572,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
 
-            {/* Text input */}
             <div className="flex-1 flex items-center bg-white/5 border border-white/8 rounded-full px-4 py-2.5 min-w-0">
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 disabled={sending}
-                placeholder={previewImage ? "Add caption..." : "Message..."}
+                placeholder={replyTo ? `Reply to ${replyTo.displayName}...` : previewImage ? "Add caption..." : "Message..."}
                 className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-[15px] min-w-0"
                 autoComplete="off"
                 autoCapitalize="sentences"
@@ -357,7 +588,6 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
               />
             </div>
 
-            {/* Send */}
             <button
               type="submit"
               disabled={(!input.trim() && !previewImage) || sending || uploadingImage}
@@ -386,10 +616,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             <h3 className="text-green-300 font-bold text-base mb-2">Delete # {room?.name}?</h3>
             <p className="text-green-800 text-sm mb-5">All messages will be permanently deleted. This cannot be undone.</p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-3 border border-white/8 text-green-800 rounded-xl text-sm"
-              >
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 border border-white/8 text-green-800 rounded-xl text-sm">
                 Cancel
               </button>
               <button
@@ -404,12 +631,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
         </div>
       )}
 
-      {/* Profile modal */}
       {profileUid && (
         <ProfileModal
           uid={profileUid}
           onClose={() => setProfileUid(null)}
-          onSendMessage={handleSendMessageFromProfile}
+          onSendMessage={async (uid) => {
+            const rid = await openDM(uid);
+            if (rid) setProfileUid(null);
+          }}
         />
       )}
     </>

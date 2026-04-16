@@ -1,10 +1,17 @@
 import { useState, useEffect } from "react";
 import {
   collection, addDoc, query, orderBy, onSnapshot,
-  serverTimestamp, Timestamp, doc, updateDoc, limit
+  serverTimestamp, Timestamp, doc, updateDoc, limit, arrayUnion, arrayRemove
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+
+export interface ReplyInfo {
+  id: string;
+  text: string;
+  displayName: string;
+  imageUrl?: string;
+}
 
 export interface Message {
   id: string;
@@ -15,6 +22,9 @@ export interface Message {
   photoURL: string | null;
   createdAt: Timestamp | null;
   type?: "system" | "message";
+  reactions?: Record<string, string[]>;
+  replyTo?: ReplyInfo;
+  readBy?: string[];
 }
 
 export function useMessages(roomId: string | null) {
@@ -34,7 +44,7 @@ export function useMessages(roomId: string | null) {
     return unsub;
   }, [roomId]);
 
-  const sendMessage = async (text: string, imageUrl?: string) => {
+  const sendMessage = async (text: string, imageUrl?: string, replyTo?: ReplyInfo) => {
     if (!roomId || !user) return;
     if (!text.trim() && !imageUrl) return;
 
@@ -45,8 +55,10 @@ export function useMessages(roomId: string | null) {
       photoURL: user.photoURL ?? null,
       createdAt: serverTimestamp(),
       type: "message",
+      readBy: [user.uid],
     };
     if (imageUrl) msg.imageUrl = imageUrl;
+    if (replyTo) msg.replyTo = replyTo;
 
     await addDoc(collection(db, "rooms", roomId, "messages"), msg);
     await updateDoc(doc(db, "rooms", roomId), {
@@ -55,5 +67,24 @@ export function useMessages(roomId: string | null) {
     });
   };
 
-  return { messages, sendMessage };
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!roomId || !user) return;
+    const msgRef = doc(db, "rooms", roomId, "messages", messageId);
+    const msg = messages.find((m) => m.id === messageId);
+    if (!msg) return;
+    const hasReacted = msg.reactions?.[emoji]?.includes(user.uid);
+    if (hasReacted) {
+      await updateDoc(msgRef, { [`reactions.${emoji}`]: arrayRemove(user.uid) });
+    } else {
+      await updateDoc(msgRef, { [`reactions.${emoji}`]: arrayUnion(user.uid) });
+    }
+  };
+
+  const markRead = async (messageId: string) => {
+    if (!roomId || !user) return;
+    const msgRef = doc(db, "rooms", roomId, "messages", messageId);
+    await updateDoc(msgRef, { readBy: arrayUnion(user.uid) });
+  };
+
+  return { messages, sendMessage, toggleReaction, markRead };
 }
