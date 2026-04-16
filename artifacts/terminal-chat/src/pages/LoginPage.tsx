@@ -27,7 +27,8 @@ export default function LoginPage() {
     let i = 0;
     const interval = setInterval(() => {
       if (i < BOOT_LINES.length) {
-        setLines((prev) => [...prev, BOOT_LINES[i]]);
+        const line = BOOT_LINES[i] ?? "";
+        setLines((prev) => [...prev, line]);
         i++;
       } else {
         clearInterval(interval);
@@ -59,9 +60,9 @@ export default function LoginPage() {
             <span className="ml-2">termchat -- bash -- 80x24</span>
           </div>
           <div className="space-y-1 text-sm leading-relaxed min-h-[280px]">
-            {lines.map((line, i) => (
-              <div key={i} className={line.startsWith("──") ? "text-green-700" : line === "" ? "h-3" : "text-green-400"}>
-                {line}
+            {lines.filter((l) => l !== undefined && l !== null).map((line, i) => (
+              <div key={i} className={line.startsWith("\u2500") ? "text-green-700" : line === "" ? "h-3" : "text-green-400"}>
+                {line || "\u00A0"}
               </div>
             ))}
             {showPrompt && (
