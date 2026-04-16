@@ -1,0 +1,14 @@
+{
+  "buildCommand": "pnpm --filter @workspace/terminal-chat run build",
+  "outputDirectory": "artifacts/terminal-chat/dist/public",
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "framework": null,
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@5"
+    }
+  }
+}
