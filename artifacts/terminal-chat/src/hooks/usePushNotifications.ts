@@ -32,13 +32,24 @@ export function usePushNotifications() {
         const registration = await navigator.serviceWorker.ready;
         const vapidKey = await getVapidPublicKey();
 
-        let subscription = await registration.pushManager.getSubscription();
-        if (!subscription) {
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey),
-          });
+        if (!vapidKey) {
+          console.warn("VAPID public key not available");
+          return;
         }
+
+        const applicationServerKey = urlBase64ToUint8Array(vapidKey);
+
+        // Always unsubscribe the old subscription and create a fresh one
+        // This ensures the subscription matches the current VAPID keys on the server
+        const existing = await registration.pushManager.getSubscription();
+        if (existing) {
+          await existing.unsubscribe();
+        }
+
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
 
         const subJson = subscription.toJSON();
         await updateDoc(doc(db, "users", user.uid), {
