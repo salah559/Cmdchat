@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   collection, onSnapshot, addDoc, doc, setDoc,
   query, serverTimestamp, Timestamp, getDoc,
-  where, getDocs, updateDoc, arrayUnion
+  where, getDocs, updateDoc, arrayUnion, deleteDoc, writeBatch
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,8 +24,6 @@ export function useRooms() {
 
   useEffect(() => {
     if (!user) return;
-    // No orderBy to avoid requiring a composite Firestore index
-    // We sort client-side instead
     const q = query(
       collection(db, "rooms"),
       where("members", "array-contains", user.uid)
@@ -35,7 +33,6 @@ export function useRooms() {
         id: d.id,
         ...(d.data() as Omit<Room, "id">),
       }));
-      // Sort client-side: rooms with recent messages first
       list.sort((a, b) => {
         const aTime = a.lastMessageAt?.toMillis() ?? a.createdAt?.toMillis() ?? 0;
         const bTime = b.lastMessageAt?.toMillis() ?? b.createdAt?.toMillis() ?? 0;
@@ -81,6 +78,16 @@ export function useRooms() {
     return dmId;
   };
 
+  const deleteRoom = async (roomId: string): Promise<void> => {
+    // Delete messages subcollection first
+    const messagesRef = collection(db, "rooms", roomId, "messages");
+    const msgSnap = await getDocs(messagesRef);
+    const batch = writeBatch(db);
+    msgSnap.docs.forEach((d) => batch.delete(d.ref));
+    batch.delete(doc(db, "rooms", roomId));
+    await batch.commit();
+  };
+
   const ensureGeneralRoom = async () => {
     if (!user) return;
     const q = query(
@@ -108,5 +115,5 @@ export function useRooms() {
     }
   };
 
-  return { rooms, createGroup, openDM, ensureGeneralRoom };
+  return { rooms, createGroup, openDM, deleteRoom, ensureGeneralRoom };
 }

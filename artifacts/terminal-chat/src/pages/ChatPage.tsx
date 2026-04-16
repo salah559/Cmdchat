@@ -24,9 +24,15 @@ export default function ChatPage() {
     setShowChat(true);
   };
 
+  const handleRoomDeleted = () => {
+    setActiveRoomId(null);
+    setShowChat(false);
+  };
+
   return (
-    <div className="h-screen h-svh flex overflow-hidden bg-[#0a0a0a]">
-      {/* Conversation List — always visible on lg, slide on mobile */}
+    /* 100dvh resizes dynamically when the keyboard opens on mobile */
+    <div className="flex overflow-hidden bg-[#0a0a0a]" style={{ height: "100dvh" }}>
+      {/* Conversation List */}
       <div className={`
         absolute inset-0 lg:relative lg:w-80 lg:shrink-0 z-20
         transition-transform duration-300 ease-in-out
@@ -38,8 +44,7 @@ export default function ChatPage() {
         />
       </div>
 
-      {/* Divider on desktop */}
-      <div className="hidden lg:block w-px bg-white/5 shrink-0"></div>
+      <div className="hidden lg:block w-px bg-white/5 shrink-0" />
 
       {/* Chat Area */}
       <div className={`
@@ -48,8 +53,9 @@ export default function ChatPage() {
         ${showChat ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
       `}>
         <ChatArea
-          roomId={showChat || window.innerWidth >= 1024 ? activeRoomId : null}
+          roomId={activeRoomId}
           onBack={() => setShowChat(false)}
+          onRoomDeleted={handleRoomDeleted}
         />
       </div>
     </div>

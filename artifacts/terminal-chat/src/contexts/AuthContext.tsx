@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import {
+  User, onAuthStateChanged, signInWithPopup, signOut,
+  updateProfile as updateFirebaseProfile,
+} from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, googleProvider, db } from "@/lib/firebase";
 
@@ -8,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (displayName: string, photoURL: string | null, bio?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -28,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: u.email ?? null,
           status: "online",
           lastSeen: serverTimestamp(),
+          joinedAt: serverTimestamp(),
         }, { merge: true });
       }
     });
@@ -64,8 +69,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   };
 
+  const updateProfile = async (displayName: string, photoURL: string | null, bio?: string) => {
+    if (!user) return;
+    await setDoc(doc(db, "users", user.uid), {
+      displayName,
+      photoURL,
+      bio: bio ?? "",
+    }, { merge: true });
+    await updateFirebaseProfile(user, {
+      displayName,
+      photoURL: photoURL ?? undefined,
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

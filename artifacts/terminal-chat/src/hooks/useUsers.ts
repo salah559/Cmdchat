@@ -7,8 +7,10 @@ export interface ChatUser {
   displayName: string;
   photoURL: string | null;
   email: string | null;
+  bio?: string;
   status: "online" | "offline";
   lastSeen: Timestamp | null;
+  joinedAt: Timestamp | null;
 }
 
 export function useUsers() {
@@ -29,8 +31,10 @@ export function useUsers() {
           displayName: data.displayName ?? "Unknown",
           photoURL: data.photoURL ?? null,
           email: data.email ?? null,
+          bio: data.bio ?? "",
           status,
           lastSeen,
+          joinedAt: data.joinedAt ?? null,
         };
       });
       list.sort((a, b) => {
