@@ -30,7 +30,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex overflow-hidden bg-[#0a0a0a]" style={{ height: "100dvh" }}>
+    <div className="flex overflow-hidden bg-[#0a0a0a] flex-1 min-h-0" style={{ height: "100dvh" }}>
       {/* Conversation List */}
       <div
         className={`

@@ -264,7 +264,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted }: ChatAreaProp
                         <img
                           src={msg.imageUrl}
                           alt="Sent image"
-                          className={`max-w-[240px] max-h-[280px] object-cover rounded-2xl border border-white/8 ${isOwn ? "rounded-br-sm" : "rounded-bl-sm"}`}
+                          className={`max-w-[65vw] sm:max-w-[240px] max-h-[260px] object-cover rounded-2xl border border-white/8 ${isOwn ? "rounded-br-sm" : "rounded-bl-sm"}`}
                           loading="lazy"
                         />
                       </a>
@@ -351,6 +351,8 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted }: ChatAreaProp
                 className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-[15px] min-w-0"
                 autoComplete="off"
                 autoCapitalize="sentences"
+                enterKeyHint="send"
+                inputMode="text"
               />
             </div>
 
