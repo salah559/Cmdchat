@@ -31,12 +31,14 @@ export default function ChatPage() {
 
   return (
     <div className="flex overflow-hidden bg-[#0a0a0a]" style={{ height: "100dvh" }}>
-      {/* Conversation List — slides off-screen on mobile when chat is open */}
+      {/* Conversation List */}
       <div
         className={`
-          absolute inset-0 md:relative md:w-80 lg:w-96 md:shrink-0 z-20
+          absolute inset-0 md:relative md:w-80 lg:w-96 md:shrink-0
           transition-transform duration-300 ease-in-out
-          ${showChat ? "-translate-x-full md:translate-x-0" : "translate-x-0"}
+          ${showChat
+            ? "-translate-x-full md:translate-x-0 z-10 pointer-events-none md:pointer-events-auto"
+            : "translate-x-0 z-20 pointer-events-auto"}
         `}
       >
         <ConversationList
@@ -47,12 +49,14 @@ export default function ChatPage() {
 
       <div className="hidden md:block w-px bg-white/5 shrink-0" />
 
-      {/* Chat Area — slides in from right on mobile */}
+      {/* Chat Area */}
       <div
         className={`
           absolute inset-0 md:relative md:flex-1
           transition-transform duration-300 ease-in-out
-          ${showChat ? "translate-x-0" : "translate-x-full md:translate-x-0"}
+          ${showChat
+            ? "translate-x-0 z-20 pointer-events-auto"
+            : "translate-x-full md:translate-x-0 z-10 pointer-events-none md:pointer-events-auto"}
         `}
       >
         <ChatArea
