@@ -3,6 +3,7 @@ import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRooms, Room } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
+import Avatar from "./Avatar";
 
 interface ChatAreaProps {
   roomId: string | null;
@@ -18,13 +19,24 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
   const room: Room | undefined = rooms.find((r) => r.id === roomId);
 
+  const otherUser = (() => {
+    if (!room || room.type !== "dm") return null;
+    const otherId = room.members.find((m) => m !== user?.uid);
+    return users.find((u) => u.uid === otherId) ?? null;
+  })();
+
+  const roomTitle = (() => {
+    if (!room) return "";
+    if (room.type === "group") return `# ${room.name}`;
+    return otherUser?.displayName ?? "DM";
+  })();
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }, [messages.length]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,134 +55,166 @@ export default function ChatArea({ roomId, onBack }: ChatAreaProps) {
     return ts.toDate().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
   };
 
-  const getRoomTitle = () => {
-    if (!room) return "";
-    if (room.type === "group") return `#${room.name}`;
-    const otherId = room.members.find((m) => m !== user?.uid);
-    const other = users.find((u) => u.uid === otherId);
-    return other?.displayName ?? "DM";
+  const formatDateLabel = (ts: { toDate: () => Date } | null) => {
+    if (!ts) return "";
+    const d = ts.toDate();
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) return "Today";
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   };
-
-  const getOtherUser = () => {
-    if (!room || room.type !== "dm") return null;
-    const otherId = room.members.find((m) => m !== user?.uid);
-    return users.find((u) => u.uid === otherId) ?? null;
-  };
-
-  const otherUser = getOtherUser();
-  const handle = user?.displayName?.split(" ")[0]?.toLowerCase() ?? "user";
 
   if (!roomId) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#050505] text-center px-6">
-        <div className="space-y-4">
-          <div className="text-green-700 text-4xl font-bold tracking-widest">TC</div>
-          <div className="text-green-600 text-sm font-bold tracking-widest">TERMCHAT</div>
-          <div className="text-green-900 text-xs space-y-1 mt-4">
-            <div>Select a channel to start chatting</div>
-            <div>or tap a user to send a direct message</div>
-          </div>
-          <div className="text-green-800 text-lg mt-6 animate-pulse">_</div>
+      <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-center px-6">
+        <div className="w-20 h-20 rounded-full bg-green-900/20 border border-green-900/50 flex items-center justify-center mb-4">
+          <span className="text-green-600 text-3xl font-bold">TC</span>
         </div>
+        <h2 className="text-green-400 font-bold text-lg mb-2">TermChat</h2>
+        <p className="text-green-800 text-sm">Select a conversation to start messaging</p>
       </div>
     );
   }
 
+  let lastDateLabel = "";
+
   return (
-    <div className="h-full flex flex-col bg-[#050505]">
-      <div className="px-4 py-3 border-b border-green-900/60 flex items-center gap-3 shrink-0">
+    <div className="h-full flex flex-col bg-[#0a0a0a]">
+      {/* Header */}
+      <div className="px-3 pt-12 pb-3 bg-[#0f0f0f] border-b border-white/5 flex items-center gap-3 shrink-0">
         <button
           onClick={onBack}
-          className="md:hidden text-green-700 hover:text-green-400 text-sm transition-colors mr-1"
+          className="lg:hidden p-2 text-green-600 hover:text-green-400 active:scale-95 transition-all mr-1 -ml-1"
         >
-          ← back
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
         </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-green-400 font-bold text-sm truncate">{getRoomTitle()}</span>
-            {otherUser && (
-              <span className={`flex items-center gap-1 text-xs shrink-0 ${otherUser.status === "online" ? "text-green-500" : "text-green-900"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${otherUser.status === "online" ? "bg-green-500 shadow-[0_0_4px_#22c55e]" : "bg-green-900"}`}></span>
-                {otherUser.status}
-              </span>
-            )}
-          </div>
-          {room?.type === "group" && (
-            <div className="text-green-800 text-xs">{room.members.length} members</div>
-          )}
-        </div>
-      </div>
 
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
-      >
-        {messages.length === 0 && (
-          <div className="text-green-900 text-xs italic text-center mt-8">
-            No messages yet. Say something!
+        {room?.type === "dm" && otherUser ? (
+          <div className="relative shrink-0">
+            <Avatar name={otherUser.displayName} photoURL={otherUser.photoURL} size="sm" />
+            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0f0f0f] ${otherUser.status === "online" ? "bg-green-500" : "bg-gray-700"}`}></span>
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-green-900/40 border border-green-800/50 flex items-center justify-center shrink-0">
+            <span className="text-green-500 font-bold text-sm">#</span>
           </div>
         )}
 
-        <div className="space-y-1">
-          {messages.map((msg, i) => {
-            const isOwn = msg.uid === user?.uid;
-            const prev = messages[i - 1];
-            const showHeader = !prev || prev.uid !== msg.uid;
-            const showTime = showHeader || (i > 0 && (() => {
-              const cur = msg.createdAt?.toDate().getTime() ?? 0;
-              const pre = messages[i-1].createdAt?.toDate().getTime() ?? 0;
-              return cur - pre > 300000;
-            })());
+        <div className="flex-1 min-w-0">
+          <div className="text-green-300 font-semibold text-sm truncate">{roomTitle}</div>
+          {otherUser ? (
+            <div className={`text-xs ${otherUser.status === "online" ? "text-green-600" : "text-green-900"}`}>
+              {otherUser.status === "online" ? "Online" : "Offline"}
+            </div>
+          ) : room?.type === "group" ? (
+            <div className="text-green-900 text-xs">{room.members.length} members</div>
+          ) : null}
+        </div>
+      </div>
 
-            return (
-              <div key={msg.id} className={showHeader && i > 0 ? "mt-3" : ""}>
-                {showHeader && (
-                  <div className="flex items-baseline gap-2 mb-0.5">
-                    <span className={`text-xs font-bold ${isOwn ? "text-cyan-500" : "text-yellow-500"}`}>
-                      {isOwn ? "you" : msg.displayName}
-                    </span>
-                    <span className="text-green-900 text-[10px]">{formatTime(msg.createdAt)}</span>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-green-900 text-sm">
+            <p>No messages yet</p>
+            <p className="text-xs mt-1">Send the first message!</p>
+          </div>
+        )}
+
+        {messages.map((msg, i) => {
+          const isOwn = msg.uid === user?.uid;
+          const prev = messages[i - 1];
+          const next = messages[i + 1];
+          const isGroupStart = !prev || prev.uid !== msg.uid ||
+            (msg.createdAt && prev.createdAt && msg.createdAt.toDate().getTime() - prev.createdAt.toDate().getTime() > 120000);
+          const isGroupEnd = !next || next.uid !== msg.uid ||
+            (msg.createdAt && next.createdAt && next.createdAt.toDate().getTime() - msg.createdAt.toDate().getTime() > 120000);
+
+          const dateLabel = formatDateLabel(msg.createdAt);
+          const showDate = dateLabel !== lastDateLabel;
+          if (showDate) lastDateLabel = dateLabel;
+
+          return (
+            <div key={msg.id}>
+              {showDate && (
+                <div className="flex items-center gap-3 my-4">
+                  <div className="flex-1 h-px bg-white/5"></div>
+                  <span className="text-green-900 text-xs px-2">{dateLabel}</span>
+                  <div className="flex-1 h-px bg-white/5"></div>
+                </div>
+              )}
+
+              <div className={`flex items-end gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"} ${isGroupStart ? "mt-3" : "mt-0.5"}`}>
+                {/* Avatar — only for others, only at group end */}
+                {!isOwn && room?.type === "group" && (
+                  <div className="w-7 shrink-0 mb-1">
+                    {isGroupEnd ? (
+                      <Avatar name={msg.displayName} photoURL={msg.photoURL} size="sm" />
+                    ) : null}
                   </div>
                 )}
-                <div className={`flex gap-2 ${isOwn ? "flex-row-reverse md:flex-row" : ""}`}>
+
+                <div className={`flex flex-col max-w-[78%] ${isOwn ? "items-end" : "items-start"}`}>
+                  {isGroupStart && !isOwn && room?.type === "group" && (
+                    <span className="text-green-700 text-xs font-semibold mb-1 ml-1">{msg.displayName}</span>
+                  )}
                   <div className={`
-                    max-w-[85%] px-3 py-2 text-sm leading-relaxed break-words
+                    px-3.5 py-2.5 text-sm leading-relaxed break-words
                     ${isOwn
-                      ? "bg-green-900/25 text-cyan-300 border border-green-900/50 ml-auto md:ml-0"
-                      : "bg-black/50 text-green-300 border border-green-900/30"}
+                      ? `bg-green-800/50 text-green-100 ${isGroupStart ? "rounded-t-2xl" : ""} ${isGroupEnd ? "rounded-bl-2xl rounded-br-sm" : ""} ${!isGroupStart && !isGroupEnd ? "rounded-l-2xl rounded-r-sm" : ""} ${isGroupStart && isGroupEnd ? "rounded-2xl rounded-br-sm" : ""}`
+                      : `bg-[#1a1a1a] text-green-200 border border-white/5 ${isGroupStart ? "rounded-t-2xl" : ""} ${isGroupEnd ? "rounded-br-2xl rounded-bl-sm" : ""} ${!isGroupStart && !isGroupEnd ? "rounded-r-2xl rounded-l-sm" : ""} ${isGroupStart && isGroupEnd ? "rounded-2xl rounded-bl-sm" : ""}`
+                    }
                   `}>
                     {msg.text}
                   </div>
+                  {isGroupEnd && (
+                    <span className="text-green-900 text-[10px] mt-1 mx-1">{formatTime(msg.createdAt)}</span>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
-        <div ref={bottomRef} className="h-1" />
+            </div>
+          );
+        })}
+        <div ref={bottomRef} className="h-2" />
       </div>
 
-      <div className="border-t border-green-900/60 px-3 py-3 shrink-0 bg-[#050505]">
+      {/* Input */}
+      <div className="px-3 py-3 pb-6 bg-[#0f0f0f] border-t border-white/5 shrink-0">
         <form onSubmit={handleSend} className="flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-2 border border-green-900/60 bg-black/40 px-3 py-2.5">
-            <span className="text-green-800 text-xs shrink-0 hidden sm:block">{handle}$</span>
+          <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
+          <div className="flex-1 flex items-center bg-white/5 border border-white/8 rounded-full px-4 py-2.5">
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={sending}
-              placeholder="Type a message..."
-              className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900/60 text-sm caret-green-400 font-mono min-w-0"
+              placeholder="Message..."
+              className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-sm font-mono min-w-0"
               autoComplete="off"
-              autoCapitalize="none"
+              autoCapitalize="sentences"
             />
           </div>
           <button
             type="submit"
-            disabled={sending || !input.trim()}
-            className="border border-green-800 text-green-600 hover:text-green-400 hover:border-green-600 px-4 py-2.5 text-sm transition-all disabled:opacity-30 shrink-0 active:scale-95"
+            disabled={!input.trim() || sending}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 shrink-0 ${
+              input.trim() && !sending
+                ? "bg-green-600 text-black hover:bg-green-500"
+                : "bg-white/5 text-green-900"
+            }`}
           >
-            {sending ? "·" : "→"}
+            {sending ? (
+              <span className="w-4 h-4 border-2 border-green-900 border-t-green-400 rounded-full animate-spin"></span>
+            ) : (
+              <svg className="w-4 h-4 rotate-90" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            )}
           </button>
         </form>
       </div>
