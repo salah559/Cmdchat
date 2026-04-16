@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+pnpm workspace monorepo using TypeScript. Includes a terminal-style chat app with Firebase backend.
 
 ## Stack
 
@@ -11,10 +11,27 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: PostgreSQL + Drizzle ORM (for future use), Firebase Firestore (messages)
+- **Auth**: Firebase Google Auth
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Frontend**: React + Vite (terminal-chat artifact)
+
+## Artifacts
+
+### terminal-chat (React + Vite)
+- **Path**: `artifacts/terminal-chat/`
+- **Preview**: `/` (root)
+- **Design**: Terminal/CMD aesthetic — black background, green monospace text
+- **Auth**: Firebase Google Sign-In
+- **Database**: Firebase Firestore (messages collection)
+- **Deploy**: Vercel-ready with `vercel.json`
+
+### Firebase Config
+- **Project**: `chat-6d518`
+- **Config**: embedded in `artifacts/terminal-chat/src/lib/firebase.ts`
+- **Collections**: `messages` (text, uid, displayName, photoURL, createdAt)
 
 ## Key Commands
 
@@ -23,5 +40,13 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
+- `pnpm --filter @workspace/terminal-chat run dev` — run frontend locally
+
+## Vercel Deployment
+
+To deploy `terminal-chat` to Vercel:
+1. Root directory: `artifacts/terminal-chat`
+2. Build command: `pnpm run build`
+3. Output directory: `dist/public`
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
