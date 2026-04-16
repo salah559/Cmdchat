@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, googleProvider, db } from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -16,18 +17,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setLoading(false);
+      if (u) {
+        await setDoc(doc(db, "users", u.uid), {
+          uid: u.uid,
+          displayName: u.displayName ?? "Anonymous",
+          photoURL: u.photoURL ?? null,
+          email: u.email ?? null,
+          status: "online",
+          lastSeen: serverTimestamp(),
+        }, { merge: true });
+      }
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(async () => {
+      await setDoc(doc(db, "users", user.uid), { lastSeen: serverTimestamp(), status: "online" }, { merge: true });
+    }, 30000);
+    const handleOffline = () => {
+      setDoc(doc(db, "users", user.uid), { status: "offline", lastSeen: serverTimestamp() }, { merge: true });
+    };
+    window.addEventListener("beforeunload", handleOffline);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") handleOffline();
+      else setDoc(doc(db, "users", user.uid), { status: "online", lastSeen: serverTimestamp() }, { merge: true });
+    });
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("beforeunload", handleOffline);
+    };
+  }, [user]);
 
   const signInWithGoogle = async () => {
     await signInWithPopup(auth, googleProvider);
   };
 
   const logout = async () => {
+    if (user) {
+      await setDoc(doc(db, "users", user.uid), { status: "offline", lastSeen: serverTimestamp() }, { merge: true });
+    }
     await signOut(auth);
   };
 
