@@ -30,28 +30,31 @@ export default function ChatPage() {
   };
 
   return (
-    /* 100dvh resizes dynamically when the keyboard opens on mobile */
     <div className="flex overflow-hidden bg-[#0a0a0a]" style={{ height: "100dvh" }}>
-      {/* Conversation List */}
-      <div className={`
-        absolute inset-0 lg:relative lg:w-80 lg:shrink-0 z-20
-        transition-transform duration-300 ease-in-out
-        ${showChat ? "-translate-x-full lg:translate-x-0" : "translate-x-0"}
-      `}>
+      {/* Conversation List — slides off-screen on mobile when chat is open */}
+      <div
+        className={`
+          absolute inset-0 md:relative md:w-80 lg:w-96 md:shrink-0 z-20
+          transition-transform duration-300 ease-in-out
+          ${showChat ? "-translate-x-full md:translate-x-0" : "translate-x-0"}
+        `}
+      >
         <ConversationList
           activeRoomId={activeRoomId}
           onSelectRoom={handleSelectRoom}
         />
       </div>
 
-      <div className="hidden lg:block w-px bg-white/5 shrink-0" />
+      <div className="hidden md:block w-px bg-white/5 shrink-0" />
 
-      {/* Chat Area */}
-      <div className={`
-        absolute inset-0 lg:relative lg:flex-1
-        transition-transform duration-300 ease-in-out
-        ${showChat ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
-      `}>
+      {/* Chat Area — slides in from right on mobile */}
+      <div
+        className={`
+          absolute inset-0 md:relative md:flex-1
+          transition-transform duration-300 ease-in-out
+          ${showChat ? "translate-x-0" : "translate-x-full md:translate-x-0"}
+        `}
+      >
         <ChatArea
           roomId={activeRoomId}
           onBack={() => setShowChat(false)}

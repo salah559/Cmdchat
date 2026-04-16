@@ -122,11 +122,16 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted }: ChatAreaProp
   if (!roomId) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-center px-6">
-        <div className="w-20 h-20 rounded-full bg-green-900/20 border border-green-900/50 flex items-center justify-center mb-4">
-          <span className="text-green-600 text-3xl font-bold font-mono">TC</span>
+        <div className="w-24 h-24 rounded-3xl bg-green-900/15 border border-green-900/30 flex items-center justify-center mb-5 shadow-[0_0_60px_rgba(0,200,0,0.05)]">
+          <span className="text-green-500 text-4xl font-bold font-mono">TC</span>
         </div>
-        <h2 className="text-green-400 font-bold text-lg mb-2">TermChat</h2>
-        <p className="text-green-800 text-sm">Select a conversation to start messaging</p>
+        <h2 className="text-green-300 font-bold text-xl mb-2 font-mono">TermChat</h2>
+        <p className="text-green-800 text-sm max-w-xs leading-relaxed">Select a channel or conversation from the sidebar to start messaging</p>
+        <div className="flex items-center gap-2 mt-6 text-green-900 text-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-900"></span>
+          <span>End-to-end · Real-time · Firebase</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-900"></span>
+        </div>
       </div>
     );
   }
@@ -143,7 +148,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted }: ChatAreaProp
         >
           <button
             onClick={onBack}
-            className="lg:hidden p-2 -ml-1 text-green-600 hover:text-green-400 active:scale-95 transition-all shrink-0"
+            className="md:hidden p-2 -ml-1 text-green-600 hover:text-green-400 active:scale-95 transition-all shrink-0"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

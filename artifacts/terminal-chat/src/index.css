@@ -33,6 +33,7 @@
     height: -webkit-fill-available;
     overflow: hidden;
     background: #0a0a0a;
+    scroll-behavior: smooth;
   }
 
   body {
@@ -44,6 +45,7 @@
     font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
+    touch-action: manipulation;
   }
 
   #root {
@@ -52,6 +54,7 @@
     overflow: hidden;
   }
 
+  /* Prevent iOS zoom on input focus while keeping readable font sizes */
   input, textarea, select {
     font-size: 16px !important;
   }
@@ -61,10 +64,17 @@
     color: #86efac;
   }
 
-  ::-webkit-scrollbar { width: 0px; }
+  /* Hide scrollbars but keep scrolling functional */
+  ::-webkit-scrollbar { width: 0px; height: 0px; }
+  * { scrollbar-width: none; }
 
   * {
     border-color: rgba(255,255,255,0.06);
+  }
+
+  /* Smooth scroll for message lists */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
   }
 }
 
