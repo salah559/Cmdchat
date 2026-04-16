@@ -11,9 +11,10 @@ interface ChatAreaProps {
   roomId: string | null;
   onBack: () => void;
   onRoomDeleted: () => void;
+  showBack?: boolean;
 }
 
-export default function ChatArea({ roomId, onBack, onRoomDeleted }: ChatAreaProps) {
+export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = false }: ChatAreaProps) {
   const { user } = useAuth();
   const { rooms, openDM, deleteRoom } = useRooms();
   const users = useUsers();
@@ -148,7 +149,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted }: ChatAreaProp
         >
           <button
             onClick={onBack}
-            className="md:hidden p-2 -ml-1 text-green-600 hover:text-green-400 active:scale-95 transition-all shrink-0"
+            className={`${showBack ? "flex" : "hidden"} p-2 -ml-1 text-green-600 hover:text-green-400 active:scale-95 transition-all shrink-0 items-center justify-center`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

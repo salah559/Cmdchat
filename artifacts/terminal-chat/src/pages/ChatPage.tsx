@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import ConversationList from "@/components/ConversationList";
 import ChatArea from "@/components/ChatArea";
 import { useRooms } from "@/hooks/useRooms";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function ChatPage() {
   const { rooms, ensureGeneralRoom } = useRooms();
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     ensureGeneralRoom();
@@ -29,42 +31,35 @@ export default function ChatPage() {
     setShowChat(false);
   };
 
+  const showSidebar = !isMobile || !showChat;
+  const showChatArea = !isMobile || showChat;
+
   return (
-    <div className="flex overflow-hidden bg-[#0a0a0a] flex-1 min-h-0" style={{ height: "100dvh" }}>
-      {/* Conversation List */}
-      <div
-        className={`
-          absolute inset-0 md:relative md:w-80 lg:w-96 md:shrink-0
-          transition-transform duration-300 ease-in-out
-          ${showChat
-            ? "-translate-x-full md:translate-x-0 z-10 pointer-events-none md:pointer-events-auto"
-            : "translate-x-0 z-20 pointer-events-auto"}
-        `}
-      >
-        <ConversationList
-          activeRoomId={activeRoomId}
-          onSelectRoom={handleSelectRoom}
-        />
-      </div>
+    <div className="flex h-full overflow-hidden bg-[#0a0a0a]">
+      {showSidebar && (
+        <div
+          className="flex flex-col h-full shrink-0 overflow-hidden"
+          style={{ width: isMobile ? "100%" : "clamp(280px, 320px, 360px)" }}
+        >
+          <ConversationList
+            activeRoomId={activeRoomId}
+            onSelectRoom={handleSelectRoom}
+          />
+        </div>
+      )}
 
-      <div className="hidden md:block w-px bg-white/5 shrink-0" />
+      {!isMobile && <div className="w-px bg-white/5 shrink-0" />}
 
-      {/* Chat Area */}
-      <div
-        className={`
-          absolute inset-0 md:relative md:flex-1
-          transition-transform duration-300 ease-in-out
-          ${showChat
-            ? "translate-x-0 z-20 pointer-events-auto"
-            : "translate-x-full md:translate-x-0 z-10 pointer-events-none md:pointer-events-auto"}
-        `}
-      >
-        <ChatArea
-          roomId={activeRoomId}
-          onBack={() => setShowChat(false)}
-          onRoomDeleted={handleRoomDeleted}
-        />
-      </div>
+      {showChatArea && (
+        <div className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
+          <ChatArea
+            roomId={activeRoomId}
+            onBack={() => setShowChat(false)}
+            onRoomDeleted={handleRoomDeleted}
+            showBack={isMobile}
+          />
+        </div>
+      )}
     </div>
   );
 }
