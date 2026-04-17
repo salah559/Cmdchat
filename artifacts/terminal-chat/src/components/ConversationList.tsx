@@ -5,9 +5,11 @@ import { useUsers } from "@/hooks/useUsers";
 import { useUnread } from "@/hooks/useUnread";
 import { useTheme } from "@/contexts/ThemeContext";
 import { isSoundEnabled, toggleSound } from "@/lib/sounds";
+import { useLang } from "@/contexts/LanguageContext";
 import CreateGroupModal from "./CreateGroupModal";
 import ProfileModal from "./ProfileModal";
 import PushTestPanel from "./PushTestPanel";
+import SettingsModal from "./SettingsModal";
 import Avatar from "./Avatar";
 
 interface ConversationListProps {
@@ -23,6 +25,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const users = useUsers();
   const { markRead, isUnread } = useUnread();
   const { isDark, toggleTheme } = useTheme();
+  const { t } = useLang();
   const [tab, setTab] = useState<Tab>("channels");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [dmLoadingUid, setDmLoadingUid] = useState<string | null>(null);
@@ -30,6 +33,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const [profileUid, setProfileUid] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const [showPushTest, setShowPushTest] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const groupRooms = rooms.filter((r) => r.type === "group");
   const dmRooms = rooms.filter((r) => r.type === "dm");
@@ -146,14 +150,15 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
             </button>
 
             <div className="flex items-center gap-1 shrink-0">
-              {/* Push notification test */}
+              {/* Settings */}
               <button
-                onClick={() => setShowPushTest(true)}
-                title="اختبار الإشعارات"
+                onClick={() => setShowSettings(true)}
+                title={t.settings}
                 className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </button>
 
@@ -446,6 +451,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
       )}
 
       {showPushTest && <PushTestPanel onClose={() => setShowPushTest(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>
   );
 }
