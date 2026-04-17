@@ -58,7 +58,15 @@ export function useMessages(roomId: string | null) {
       readBy: [user.uid],
     };
     if (imageUrl) msg.imageUrl = imageUrl;
-    if (replyTo) msg.replyTo = replyTo;
+    if (replyTo) {
+      const replyData: Record<string, unknown> = {
+        id: replyTo.id,
+        text: replyTo.text,
+        displayName: replyTo.displayName,
+      };
+      if (replyTo.imageUrl) replyData.imageUrl = replyTo.imageUrl;
+      msg.replyTo = replyData;
+    }
 
     await addDoc(collection(db, "rooms", roomId, "messages"), msg);
     await updateDoc(doc(db, "rooms", roomId), {
