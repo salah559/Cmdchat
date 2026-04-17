@@ -78,6 +78,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       <div
         className="w-full sm:max-w-sm bg-[#111] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
+        dir={lang === "ar" ? "rtl" : "ltr"}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
