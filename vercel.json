@@ -5,5 +5,10 @@
   "framework": null,
   "rewrites": [
     { "source": "/:path*", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@5"
+    }
+  }
 }

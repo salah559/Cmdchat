@@ -169,12 +169,19 @@ export function PushNotificationProvider({ children }: { children: ReactNode }) 
         }),
       });
 
-      const result = await res.json();
-      if (!res.ok) {
-        return { ok: false, message: result.error ?? `Server error ${res.status}` };
+      const text = await res.text();
+      let result: { sent?: number; failed?: number; errors?: string[]; error?: string } = {};
+      try {
+        result = JSON.parse(text);
+      } catch {
+        return { ok: false, message: `خطأ في الخادم (${res.status}): ${text.slice(0, 100) || "استجابة فارغة"}` };
       }
-      if (result.failed > 0) {
-        return { ok: false, message: `فشل: ${result.errors?.join(", ") ?? "unknown error"}` };
+
+      if (!res.ok) {
+        return { ok: false, message: result.error ?? `خطأ في الخادم ${res.status}` };
+      }
+      if ((result.failed ?? 0) > 0) {
+        return { ok: false, message: `فشل الإرسال: ${result.errors?.join(", ") ?? "unknown error"}` };
       }
       return { ok: true, message: "تم الإرسال! اضغط زر الهوم وانتظر الإشعار" };
     } catch (err: unknown) {
