@@ -6,6 +6,12 @@ import { uploadImageToImgbb } from "@/lib/imgbb";
 import { isSoundEnabled, toggleSound } from "@/lib/sounds";
 import Avatar from "./Avatar";
 
+const LANGUAGES: { code: Lang; flag: string; label: (t: ReturnType<typeof useLang>["t"]) => string }[] = [
+  { code: "ar", flag: "🇸🇦", label: (t) => t.arabic },
+  { code: "en", flag: "🇬🇧", label: (t) => t.english },
+  { code: "fr", flag: "🇫🇷", label: (t) => t.french },
+];
+
 interface SettingsModalProps {
   onClose: () => void;
 }
@@ -67,7 +73,8 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
 
   const formatDate = (ts: { toDate: () => Date } | null) => {
     if (!ts) return "—";
-    return ts.toDate().toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "long" });
+    const locale = lang === "ar" ? "ar-SA" : lang === "fr" ? "fr-FR" : "en-US";
+    return ts.toDate().toLocaleDateString(locale, { year: "numeric", month: "long" });
   };
 
   return (
@@ -208,20 +215,20 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               {/* Language */}
               <div>
                 <label className="text-green-900 text-xs uppercase tracking-wider block mb-3">{t.chooseLanguage}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["ar", "en"] as Lang[]).map((l) => (
+                <div className="grid grid-cols-3 gap-2">
+                  {LANGUAGES.map((lng) => (
                     <button
-                      key={l}
-                      onClick={() => handleLangChange(l)}
+                      key={lng.code}
+                      onClick={() => handleLangChange(lng.code)}
                       className={`py-3 rounded-xl text-sm font-semibold border transition-all active:scale-[0.98] ${
-                        lang === l
+                        lang === lng.code
                           ? "bg-green-900/40 border-green-700 text-green-300"
                           : "bg-white/5 border-white/8 text-green-800 hover:text-green-600 hover:border-green-900"
                       }`}
                     >
-                      <span className="block text-base mb-0.5">{l === "ar" ? "🇸🇦" : "🇬🇧"}</span>
-                      {l === "ar" ? t.arabic : t.english}
-                      {lang === l && <span className="block text-[10px] text-green-600 mt-0.5">✓</span>}
+                      <span className="block text-base mb-0.5">{lng.flag}</span>
+                      <span className="text-xs">{lng.label(t)}</span>
+                      {lang === lng.code && <span className="block text-[10px] text-green-600 mt-0.5">✓</span>}
                     </button>
                   ))}
                 </div>
