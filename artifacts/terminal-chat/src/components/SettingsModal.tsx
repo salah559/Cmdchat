@@ -19,7 +19,7 @@ interface SettingsModalProps {
 type Tab = "account" | "preferences";
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, updateStatus } = useAuth();
   const users = useUsers();
   const { t, lang, setLang } = useLang();
   const profile = users.find((u) => u.uid === user?.uid);
@@ -28,6 +28,8 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
 
   const [name, setName] = useState(profile?.displayName ?? user?.displayName ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
+  const [statusText, setStatusText] = useState(profile?.statusText ?? "");
+  const [savingStatus, setSavingStatus] = useState(false);
   const [localPhoto, setLocalPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -45,6 +47,17 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     setSaved(true);
     setLocalPhoto(null);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleSaveStatus = async () => {
+    setSavingStatus(true);
+    await updateStatus(statusText.trim());
+    setSavingStatus(false);
+  };
+
+  const handleClearStatus = async () => {
+    setStatusText("");
+    await updateStatus("");
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,6 +190,40 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   placeholder={t.bioPlaceholder}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-green-300 text-sm outline-none focus:border-green-700 resize-none placeholder-green-900 transition-colors"
                 />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="text-green-900 text-xs uppercase tracking-wider block mb-1.5">{t.myStatus}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={statusText}
+                    onChange={(e) => setStatusText(e.target.value)}
+                    maxLength={80}
+                    placeholder={t.statusPlaceholder}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-green-300 text-sm outline-none focus:border-green-700 placeholder-green-900 transition-colors"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveStatus(); }}
+                  />
+                  <button
+                    onClick={handleSaveStatus}
+                    disabled={savingStatus}
+                    className="px-3 py-2.5 bg-green-900/40 hover:bg-green-900/60 text-green-400 text-sm rounded-xl transition-all active:scale-95 disabled:opacity-40 shrink-0 border border-green-800/40"
+                  >
+                    {savingStatus ? "..." : "✓"}
+                  </button>
+                  {statusText && (
+                    <button
+                      onClick={handleClearStatus}
+                      className="px-3 py-2.5 bg-white/5 hover:bg-white/8 text-green-800 text-sm rounded-xl transition-all active:scale-95 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {statusText && (
+                  <p className="text-green-900 text-[10px] mt-1 truncate">{statusText}</p>
+                )}
               </div>
 
               {/* Email (read-only) */}

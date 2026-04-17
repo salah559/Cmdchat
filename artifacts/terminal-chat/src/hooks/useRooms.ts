@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   collection, onSnapshot, addDoc, doc, setDoc,
   query, serverTimestamp, Timestamp, getDoc,
-  where, getDocs, updateDoc, arrayUnion, deleteDoc, writeBatch
+  where, getDocs, updateDoc, arrayUnion, arrayRemove, writeBatch
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,12 +10,15 @@ import { useAuth } from "@/contexts/AuthContext";
 export interface Room {
   id: string;
   name: string;
+  description?: string;
   type: "group" | "dm";
   members: string[];
   createdBy: string;
   createdAt: Timestamp | null;
   lastMessage: string;
   lastMessageAt: Timestamp | null;
+  pinnedMessageId?: string | null;
+  archived?: boolean;
 }
 
 export function useRooms() {
@@ -43,17 +46,19 @@ export function useRooms() {
     return unsub;
   }, [user]);
 
-  const createGroup = async (name: string, memberUids: string[]): Promise<string> => {
+  const createGroup = async (name: string, memberUids: string[], description?: string): Promise<string> => {
     if (!user) return "";
     const members = Array.from(new Set([user.uid, ...memberUids]));
     const ref = await addDoc(collection(db, "rooms"), {
       name,
+      description: description ?? "",
       type: "group",
       members,
       createdBy: user.uid,
       createdAt: serverTimestamp(),
       lastMessage: "",
       lastMessageAt: serverTimestamp(),
+      archived: false,
     });
     return ref.id;
   };
@@ -73,19 +78,43 @@ export function useRooms() {
         createdAt: serverTimestamp(),
         lastMessage: "",
         lastMessageAt: serverTimestamp(),
+        archived: false,
       });
     }
     return dmId;
   };
 
   const deleteRoom = async (roomId: string): Promise<void> => {
-    // Delete messages subcollection first
     const messagesRef = collection(db, "rooms", roomId, "messages");
     const msgSnap = await getDocs(messagesRef);
     const batch = writeBatch(db);
     msgSnap.docs.forEach((d) => batch.delete(d.ref));
     batch.delete(doc(db, "rooms", roomId));
     await batch.commit();
+  };
+
+  const archiveRoom = async (roomId: string): Promise<void> => {
+    await updateDoc(doc(db, "rooms", roomId), { archived: true });
+  };
+
+  const unarchiveRoom = async (roomId: string): Promise<void> => {
+    await updateDoc(doc(db, "rooms", roomId), { archived: false });
+  };
+
+  const pinMessage = async (roomId: string, messageId: string): Promise<void> => {
+    await updateDoc(doc(db, "rooms", roomId), { pinnedMessageId: messageId });
+  };
+
+  const unpinMessage = async (roomId: string): Promise<void> => {
+    await updateDoc(doc(db, "rooms", roomId), { pinnedMessageId: null });
+  };
+
+  const kickMember = async (roomId: string, uid: string): Promise<void> => {
+    await updateDoc(doc(db, "rooms", roomId), { members: arrayRemove(uid) });
+  };
+
+  const updateRoom = async (roomId: string, data: { name?: string; description?: string }): Promise<void> => {
+    await updateDoc(doc(db, "rooms", roomId), data);
   };
 
   const ensureGeneralRoom = async () => {
@@ -99,12 +128,14 @@ export function useRooms() {
     if (snap.empty) {
       await addDoc(collection(db, "rooms"), {
         name: "general",
+        description: "",
         type: "group",
         members: [user.uid],
         createdBy: "system",
         createdAt: serverTimestamp(),
         lastMessage: "",
         lastMessageAt: serverTimestamp(),
+        archived: false,
       });
     } else {
       const roomRef = snap.docs[0].ref;
@@ -115,5 +146,5 @@ export function useRooms() {
     }
   };
 
-  return { rooms, createGroup, openDM, deleteRoom, ensureGeneralRoom };
+  return { rooms, createGroup, openDM, deleteRoom, archiveRoom, unarchiveRoom, pinMessage, unpinMessage, kickMember, updateRoom, ensureGeneralRoom };
 }

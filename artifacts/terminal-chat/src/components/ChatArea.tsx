@@ -8,8 +8,12 @@ import { usePushNotifications } from "@/contexts/PushNotificationContext";
 import { useLang } from "@/contexts/LanguageContext";
 import { uploadImageToImgbb } from "@/lib/imgbb";
 import { playMessageSound, playSentSound, isSoundEnabled } from "@/lib/sounds";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import Avatar from "./Avatar";
 import ProfileModal from "./ProfileModal";
+import MembersModal from "./MembersModal";
+import LinkPreview, { detectUrls } from "./LinkPreview";
 
 interface ChatAreaProps {
   roomId: string | null;
@@ -22,12 +26,12 @@ const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🎉"];
 
 export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = false }: ChatAreaProps) {
   const { user } = useAuth();
-  const { rooms, openDM, deleteRoom } = useRooms();
+  const { rooms, openDM, deleteRoom, pinMessage, unpinMessage, archiveRoom, unarchiveRoom } = useRooms();
   const users = useUsers();
-  const { messages, sendMessage, toggleReaction, markRead } = useMessages(roomId);
+  const { messages, sendMessage, editMessage, deleteMessage, toggleReaction, markRead } = useMessages(roomId);
   const { typingUsers, setTyping, clearTyping } = useTyping(roomId);
   const { notifyMembers } = usePushNotifications();
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -37,12 +41,18 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyInfo | null>(null);
-  const [reactionTarget, setReactionTarget] = useState<string | null>(null);
+  const [actionSheet, setActionSheet] = useState<{ msgId: string; isOwn: boolean } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,7 +70,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   } | null>(null);
 
   const room: Room | undefined = rooms.find((r) => r.id === roomId);
-  const isGroupCreator = room?.type === "group" && room.createdBy === user?.uid;
+  const isGroupAdmin = room?.type === "group" && room.createdBy === user?.uid;
 
   const otherUser = (() => {
     if (!room || room.type !== "dm") return null;
@@ -74,12 +84,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     return otherUser?.displayName ?? "DM";
   })();
 
-  // Scroll to bottom on room change
+  const pinnedMsg = room?.pinnedMessageId
+    ? messages.find((m) => m.id === room.pinnedMessageId)
+    : null;
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [roomId]);
 
-  // Scroll to bottom + sound on new messages
   useEffect(() => {
     if (messages.length > prevMsgCount.current) {
       const lastMsg = messages[messages.length - 1];
@@ -87,26 +99,55 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
         playMessageSound();
       }
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      // Mark last message as read
       if (lastMsg && lastMsg.uid !== user?.uid && roomId) {
         markRead(lastMsg.id);
+      }
+      // @mention detection
+      if (lastMsg && lastMsg.uid !== user?.uid && user?.displayName) {
+        const name = user.displayName.split(" ")[0].toLowerCase();
+        if (lastMsg.text?.toLowerCase().includes(`@${name}`) || lastMsg.text?.toLowerCase().includes(`@${user.displayName.toLowerCase()}`)) {
+          if (isSoundEnabled()) {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+          }
+        }
       }
     }
     prevMsgCount.current = messages.length;
   }, [messages.length]);
 
-  // Close reaction picker on outside tap
   useEffect(() => {
-    if (!reactionTarget) return;
-    const handler = () => setReactionTarget(null);
+    if (!actionSheet) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-action-sheet]")) setActionSheet(null);
+    };
     setTimeout(() => document.addEventListener("click", handler), 0);
     return () => document.removeEventListener("click", handler);
-  }, [reactionTarget]);
+  }, [actionSheet]);
 
-  // Focus search input when opened
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const handler = () => setShowMoreMenu(false);
+    setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => document.removeEventListener("click", handler);
+  }, [showMoreMenu]);
+
   useEffect(() => {
     if (searchOpen) setTimeout(() => searchRef.current?.focus(), 100);
   }, [searchOpen]);
+
+  useEffect(() => {
+    if (editingMsgId) setTimeout(() => editInputRef.current?.focus(), 80);
+  }, [editingMsgId]);
 
   const filteredMessages = searchQuery.trim()
     ? messages.filter((m) =>
@@ -130,10 +171,10 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     await sendMessage(text, imgUrl ?? undefined, reply ?? undefined);
 
     if (room && room.members.length > 1) {
-      const senderName = user?.displayName ?? "شخص ما";
-      const bodyText = imgUrl ? "📷 صورة" : (text.trim().slice(0, 80) || "رسالة");
+      const senderName = user?.displayName ?? "Someone";
+      const bodyText = imgUrl ? "📷 Photo" : (text.trim().slice(0, 80) || "Message");
       notifyMembers(room.members, {
-        title: room.type === "dm" ? senderName : `${senderName} في ${roomTitle}`,
+        title: room.type === "dm" ? senderName : `${senderName} in ${roomTitle}`,
         body: bodyText,
         tag: `room-${roomId}`,
       });
@@ -159,7 +200,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
       const url = await uploadImageToImgbb(file);
       setPreviewImage(url);
     } catch {
-      alert("Failed to upload image. Please try again.");
+      alert(t.failedUploadPhoto);
     } finally {
       setUploadingImage(false);
     }
@@ -174,9 +215,9 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     onRoomDeleted();
   };
 
-  const handleLongPressStart = useCallback((msgId: string) => {
+  const handleLongPressStart = useCallback((msgId: string, isOwn: boolean) => {
     longPressTimer.current = setTimeout(() => {
-      setReactionTarget(msgId);
+      setActionSheet({ msgId, isOwn });
     }, 450);
   }, []);
 
@@ -211,9 +252,8 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     if (!state.triggered && Math.abs(capped) >= SWIPE_THRESHOLD) {
       state.triggered = true;
       if ("vibrate" in navigator) navigator.vibrate(25);
-      handleLongPressEnd();
     }
-  }, [handleLongPressEnd]);
+  }, []);
 
   const handleSwipeEnd = useCallback(() => {
     const state = swipeState.current;
@@ -230,6 +270,51 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const handleReply = (msg: { id: string; text: string; displayName: string; imageUrl?: string }) => {
     setReplyTo({ id: msg.id, text: msg.text, displayName: msg.displayName, imageUrl: msg.imageUrl });
     inputRef.current?.focus();
+    setActionSheet(null);
+  };
+
+  const handleEditStart = (msg: { id: string; text: string }) => {
+    setEditingMsgId(msg.id);
+    setEditText(msg.text);
+    setActionSheet(null);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMsgId || !editText.trim()) return;
+    await editMessage(editingMsgId, editText.trim());
+    setEditingMsgId(null);
+    setEditText("");
+  };
+
+  const handleDeleteMsg = async (msgId: string) => {
+    if (!confirm(t.confirmDeleteMsg)) return;
+    await deleteMessage(msgId);
+    setActionSheet(null);
+  };
+
+  const handlePin = async (msgId: string) => {
+    if (!roomId) return;
+    if (room?.pinnedMessageId === msgId) {
+      await unpinMessage(roomId);
+    } else {
+      await pinMessage(roomId, msgId);
+    }
+    setActionSheet(null);
+  };
+
+  const handleBookmark = async (msgId: string, msgText: string) => {
+    if (!user) return;
+    const key = `${roomId}:${msgId}`;
+    const userRef = doc(db, "users", user.uid);
+    if (bookmarks.has(key)) {
+      await updateDoc(userRef, { [`bookmarks.${msgId}`]: null });
+      setBookmarks((prev) => { const n = new Set(prev); n.delete(key); return n; });
+    } else {
+      await updateDoc(userRef, { [`bookmarks.${msgId}`]: { roomId, msgId, text: msgText.slice(0, 120), ts: Date.now() } });
+      setBookmarks((prev) => new Set(prev).add(key));
+    }
+    setActionSheet(null);
   };
 
   const formatTime = (ts: { toDate: () => Date } | null) => {
@@ -246,6 +331,40 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     yesterday.setDate(yesterday.getDate() - 1);
     if (d.toDateString() === yesterday.toDateString()) return t.yesterday;
     return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  };
+
+  const renderText = (text: string, msgId: string) => {
+    if (!text) return null;
+    const userFirstName = user?.displayName?.split(" ")[0] ?? "";
+    const parts = text.split(/(\s+|(?=@))/);
+    return parts.map((part, idx) => {
+      if (!part) return null;
+      if (searchQuery.trim() && part.toLowerCase().includes(searchQuery.toLowerCase())) {
+        const searchParts = part.split(new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
+        return (
+          <span key={`${msgId}-p${idx}`}>
+            {searchParts.map((sp, si) =>
+              sp.toLowerCase() === searchQuery.toLowerCase()
+                ? <mark key={si} className="bg-green-600/40 text-green-200 rounded px-0.5">{sp}</mark>
+                : sp
+            )}
+          </span>
+        );
+      }
+      if (part.startsWith("@")) {
+        const mention = part.slice(1).toLowerCase();
+        const isSelf = mention === userFirstName.toLowerCase() || mention === user?.displayName?.toLowerCase();
+        return (
+          <span
+            key={`${msgId}-m${idx}`}
+            className={`font-semibold px-0.5 rounded ${isSelf ? "bg-green-500/20 text-green-300" : "text-green-500"}`}
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
   };
 
   const safeTop = "env(safe-area-inset-top, 44px)";
@@ -275,9 +394,11 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     ? lastOwnMsg.readBy.some((uid) => uid !== user?.uid)
     : false;
 
+  const activeAction = actionSheet ? messages.find((m) => m.id === actionSheet.msgId) : null;
+
   return (
     <>
-      <div className="h-full flex flex-col bg-[#0a0a0a] overflow-hidden">
+      <div className="h-full flex flex-col bg-[#0a0a0a] overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Header */}
         <div
           className="bg-[#0f0f0f] border-b border-white/5 flex items-center gap-3 px-3 pb-3 shrink-0"
@@ -319,14 +440,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             </div>
             {otherUser ? (
               <div className={`text-xs ${otherUser.status === "online" ? "text-green-600" : "text-green-900"}`}>
-                {otherUser.status === "online" ? "Online" : "Offline"}
+                {otherUser.statusText ? otherUser.statusText : otherUser.status === "online" ? t.online2 : t.offline}
               </div>
             ) : room?.type === "group" ? (
               <div className="text-green-900 text-xs">{room.members.length} {t.members}</div>
             ) : null}
           </button>
 
-          {/* Search toggle */}
+          {/* Per-room search */}
           <button
             onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(""); }}
             className={`p-2 transition-all active:scale-95 shrink-0 ${searchOpen ? "text-green-400" : "text-green-800 hover:text-green-500"}`}
@@ -336,15 +457,74 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             </svg>
           </button>
 
-          {isGroupCreator && room.name !== "general" && (
+          {/* Members button for group */}
+          {room?.type === "group" && (
             <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-2 text-red-900 hover:text-red-500 active:scale-95 transition-all shrink-0"
+              onClick={() => setShowMembersModal(true)}
+              className="p-2 text-green-800 hover:text-green-500 active:scale-95 transition-all shrink-0"
+              title={t.membersTitle}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
+          )}
+
+          {/* More options (...) */}
+          {(isGroupAdmin || room?.type === "dm") && (
+            <div className="relative shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMoreMenu(!showMoreMenu); }}
+                className="p-2 text-green-800 hover:text-green-500 active:scale-95 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </button>
+              {showMoreMenu && (
+                <div
+                  className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl z-30 min-w-[160px] overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isGroupAdmin && room.name !== "general" && (
+                    <>
+                      <button
+                        onClick={() => { setShowMembersModal(true); setShowMoreMenu(false); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        {t.editChannel}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (room.archived) await unarchiveRoom(room.id);
+                          else await archiveRoom(room.id);
+                          setShowMoreMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-green-700 text-sm hover:bg-white/5 transition-colors text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                        {room.archived ? t.unarchiveChannel : t.archiveChannel}
+                      </button>
+                      <div className="h-px bg-white/5 mx-2" />
+                      <button
+                        onClick={() => { setShowDeleteConfirm(true); setShowMoreMenu(false); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-red-500 text-sm hover:bg-white/5 transition-colors text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        {t.deleteRoom}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -373,6 +553,29 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           </div>
         )}
 
+        {/* Pinned message banner */}
+        {pinnedMsg && !pinnedMsg.deletedAt && (
+          <div className="bg-[#0f0f0f] border-b border-green-900/30 px-4 py-2 flex items-center gap-3 shrink-0">
+            <svg className="w-3.5 h-3.5 text-green-700 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-green-900 text-[10px]">{t.pinnedMsg}</p>
+              <p className="text-green-700 text-xs truncate">{pinnedMsg.text || "📷 Photo"}</p>
+            </div>
+            {isGroupAdmin && (
+              <button
+                onClick={() => roomId && unpinMessage(roomId)}
+                className="text-green-900 hover:text-green-600 transition-colors shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
           {filteredMessages.length === 0 && !searchQuery && (
@@ -388,6 +591,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           )}
 
           {filteredMessages.map((msg, i) => {
+            const isDeleted = !!msg.deletedAt;
             const isOwn = msg.uid === user?.uid;
             const prev = filteredMessages[i - 1];
             const next = filteredMessages[i + 1];
@@ -403,19 +607,22 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             const showDate = dateLabel !== lastDateLabel;
             if (showDate) lastDateLabel = dateLabel;
 
-            const hasReactions = msg.reactions && Object.values(msg.reactions).some((arr) => arr.length > 0);
-            const showReactionPicker = reactionTarget === msg.id;
+            const hasReactions = !isDeleted && msg.reactions && Object.values(msg.reactions).some((arr) => arr.length > 0);
+            const isEditing = editingMsgId === msg.id;
+            const isPinned = room?.pinnedMessageId === msg.id;
+            const isBookmarked = bookmarks.has(`${roomId}:${msg.id}`);
 
-            // Highlight search terms
-            const renderText = (text: string) => {
-              if (!searchQuery.trim()) return text;
-              const parts = text.split(new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
-              return parts.map((part, idx) =>
-                part.toLowerCase() === searchQuery.toLowerCase()
-                  ? <mark key={idx} className="bg-green-600/40 text-green-200 rounded px-0.5">{part}</mark>
-                  : part
+            const msgUrls = !isDeleted && msg.text ? detectUrls(msg.text) : [];
+
+            if (msg.type === "system") {
+              return (
+                <div key={msg.id} className="flex items-center gap-3 my-3">
+                  <div className="flex-1 h-px bg-white/5" />
+                  <span className="text-green-900 text-xs px-2">{msg.text}</span>
+                  <div className="flex-1 h-px bg-white/5" />
+                </div>
               );
-            };
+            }
 
             return (
               <div key={msg.id}>
@@ -429,14 +636,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
 
                 <div
                   className={`flex items-end gap-1.5 ${isOwn ? "flex-row-reverse" : "flex-row"} ${isGroupStart ? "mt-3" : "mt-0.5"} relative select-none`}
-                  onPointerDown={() => handleLongPressStart(msg.id)}
+                  onPointerDown={() => !isDeleted && handleLongPressStart(msg.id, isOwn)}
                   onPointerUp={handleLongPressEnd}
                   onPointerLeave={handleLongPressEnd}
                   onTouchStart={(e) => handleSwipeStart(e, msg.id, isOwn)}
                   onTouchMove={handleSwipeMove}
                   onTouchEnd={handleSwipeEnd}
                   onTouchCancel={handleSwipeEnd}
-                  onContextMenu={(e) => e.preventDefault()}
+                  onContextMenu={(e) => { e.preventDefault(); if (!isDeleted) setActionSheet({ msgId: msg.id, isOwn }); }}
                 >
                   {/* Swipe-to-reply icon */}
                   <div
@@ -460,19 +667,16 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                     </div>
                   )}
 
-                  <div data-bubble className={`flex flex-col ${isOwn ? "items-end" : "items-start"} max-w-[78%] relative group`}>
+                  <div data-bubble className={`flex flex-col ${isOwn ? "items-end" : "items-start"} max-w-[78%] relative`}>
                     {isGroupStart && !isOwn && room?.type === "group" && (
-                      <button
-                        onClick={() => setProfileUid(msg.uid)}
-                        className="text-green-700 text-xs font-semibold mb-1 ml-1 active:opacity-70"
-                      >
+                      <button onClick={() => setProfileUid(msg.uid)} className="text-green-700 text-xs font-semibold mb-1 ml-1 active:opacity-70">
                         {msg.displayName}
                       </button>
                     )}
 
-                    {/* Reply preview (in message) */}
-                    {msg.replyTo && (
-                      <div className={`mb-1 px-2.5 py-1.5 rounded-xl border-l-2 border-green-600 bg-green-900/20 max-w-full ${isOwn ? "items-end" : "items-start"}`}>
+                    {/* Reply preview */}
+                    {msg.replyTo && !isDeleted && (
+                      <div className={`mb-1 px-2.5 py-1.5 rounded-xl border-l-2 border-green-600 bg-green-900/20 max-w-full`}>
                         <div className="text-green-600 text-[10px] font-semibold truncate">{msg.replyTo.displayName}</div>
                         <div className="text-green-800 text-xs truncate">
                           {msg.replyTo.imageUrl ? "📷 Photo" : msg.replyTo.text}
@@ -480,30 +684,81 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                       </div>
                     )}
 
-                    {/* Image */}
-                    {msg.imageUrl && (
-                      <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block mb-1">
-                        <img
-                          src={msg.imageUrl}
-                          alt="Sent image"
-                          className={`max-w-[65vw] sm:max-w-[240px] max-h-[260px] object-cover rounded-2xl border border-white/8 ${isOwn ? "rounded-br-sm" : "rounded-bl-sm"}`}
-                          loading="lazy"
-                        />
-                      </a>
-                    )}
-
-                    {/* Text */}
-                    {msg.text && (
-                      <div className={`px-3.5 py-2.5 text-sm leading-relaxed break-words rounded-2xl ${
-                        isOwn
-                          ? "bg-green-800/50 text-green-100 rounded-br-sm"
-                          : "bg-[#1c1c1c] text-green-200 border border-white/5 rounded-bl-sm"
-                      }`}>
-                        {renderText(msg.text)}
+                    {/* Pinned indicator */}
+                    {isPinned && (
+                      <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "flex-row-reverse" : ""}`}>
+                        <svg className="w-3 h-3 text-green-700" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+                        </svg>
+                        <span className="text-green-900 text-[10px]">{t.pinnedMsg}</span>
                       </div>
                     )}
 
-                    {/* Reactions display */}
+                    {/* Deleted message */}
+                    {isDeleted ? (
+                      <div className={`px-3.5 py-2.5 text-sm rounded-2xl italic ${
+                        isOwn ? "bg-white/4 text-green-900" : "bg-white/4 text-green-900"
+                      }`}>
+                        🚫 {lang === "ar" ? "تم حذف هذه الرسالة" : lang === "fr" ? "Message supprimé" : "This message was deleted"}
+                      </div>
+                    ) : (
+                      <>
+                        {/* Image */}
+                        {msg.imageUrl && (
+                          <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block mb-1">
+                            <img
+                              src={msg.imageUrl}
+                              alt="Sent image"
+                              className={`max-w-[65vw] sm:max-w-[240px] max-h-[260px] object-cover rounded-2xl border border-white/8 ${isOwn ? "rounded-br-sm" : "rounded-bl-sm"}`}
+                              loading="lazy"
+                            />
+                          </a>
+                        )}
+
+                        {/* Inline edit */}
+                        {isEditing ? (
+                          <form onSubmit={handleEditSubmit} className="flex items-center gap-2 w-full">
+                            <input
+                              ref={editInputRef}
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              className="flex-1 bg-green-900/20 border border-green-700/50 rounded-xl px-3 py-2 text-sm text-green-200 outline-none min-w-0"
+                            />
+                            <button type="submit" className="text-green-500 hover:text-green-400 p-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                            <button type="button" onClick={() => setEditingMsgId(null)} className="text-green-900 hover:text-green-600 p-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </form>
+                        ) : (
+                          /* Text */
+                          msg.text && (
+                            <div className={`px-3.5 py-2.5 text-sm leading-relaxed break-words rounded-2xl ${
+                              isOwn
+                                ? "bg-green-800/50 text-green-100 rounded-br-sm"
+                                : "bg-[#1c1c1c] text-green-200 border border-white/5 rounded-bl-sm"
+                            }`}>
+                              {renderText(msg.text, msg.id)}
+                              {msg.edited && (
+                                <span className="text-green-900 text-[10px] ml-1.5">({t.edited})</span>
+                              )}
+                            </div>
+                          )
+                        )}
+
+                        {/* Link preview */}
+                        {!isEditing && msgUrls.length > 0 && (
+                          <LinkPreview url={msgUrls[0]} />
+                        )}
+                      </>
+                    )}
+
+                    {/* Reactions */}
                     {hasReactions && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {Object.entries(msg.reactions ?? {}).map(([emoji, uids]) =>
@@ -525,43 +780,113 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                       </div>
                     )}
 
-                    {/* Time + Reply button + Read receipts */}
-                    {isGroupEnd && (
+                    {/* Time + controls */}
+                    {isGroupEnd && !isEditing && (
                       <div className={`flex items-center gap-2 mt-1 mx-1 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
                         <span className="text-green-900 text-[10px]">{formatTime(msg.createdAt)}</span>
-                        {/* Read receipt for DM last own message */}
                         {isOwn && room?.type === "dm" && isLastOwnInChat && (
                           <span className={`text-[10px] font-bold ${isLastOwnRead ? "text-green-500" : "text-green-900"}`}>
                             {isLastOwnRead ? "✓✓" : "✓"}
                           </span>
                         )}
-                        {/* Reply button */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleReply(msg); }}
-                          className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                          </svg>
-                        </button>
+                        {/* Bookmark indicator */}
+                        {isBookmarked && (
+                          <span className="text-green-700 text-[10px]">🔖</span>
+                        )}
+                        {!isDeleted && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleReply(msg); }}
+                            className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     )}
 
-                    {/* Reaction picker (long press) */}
-                    {showReactionPicker && (
+                    {/* Action sheet (long-press menu) */}
+                    {actionSheet?.msgId === msg.id && activeAction && (
                       <div
-                        className={`absolute ${isOwn ? "right-0" : "left-0"} -top-12 z-40 flex items-center gap-1 bg-[#1c1c1c] border border-white/10 rounded-2xl px-2 py-1.5 shadow-xl reaction-pop`}
+                        data-action-sheet
+                        className={`absolute ${isOwn ? "right-0" : "left-0"} -top-[calc(100%+8px)] z-40 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[200px]`}
+                        style={{ bottom: "auto" }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {QUICK_EMOJIS.map((emoji) => (
+                        {/* Quick reactions */}
+                        <div className="flex items-center gap-1 px-2 py-2 border-b border-white/5">
+                          {QUICK_EMOJIS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => { toggleReaction(msg.id, emoji); setActionSheet(null); }}
+                              className={`w-9 h-9 flex items-center justify-center text-lg hover:scale-125 transition-transform active:scale-95 rounded-full ${
+                                activeAction.reactions?.[emoji]?.includes(user?.uid ?? "") ? "bg-green-800/40" : ""
+                              }`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="py-1">
                           <button
-                            key={emoji}
-                            onClick={() => { toggleReaction(msg.id, emoji); setReactionTarget(null); }}
-                            className="w-8 h-8 flex items-center justify-center text-lg hover:scale-125 transition-transform active:scale-95"
+                            onClick={() => handleReply(msg)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
                           >
-                            {emoji}
+                            <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            </svg>
+                            {t.replyMsg}
                           </button>
-                        ))}
+
+                          {isOwn && !isDeleted && (
+                            <button
+                              onClick={() => handleEditStart(msg)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
+                            >
+                              <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              {t.editMsg}
+                            </button>
+                          )}
+
+                          {room?.type === "group" && isGroupAdmin && !isDeleted && (
+                            <button
+                              onClick={() => handlePin(msg.id)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
+                            >
+                              <svg className="w-4 h-4 shrink-0 text-green-700" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+                              </svg>
+                              {room.pinnedMessageId === msg.id ? t.unpinMsg : t.pinMsg}
+                            </button>
+                          )}
+
+                          {!isDeleted && (
+                            <button
+                              onClick={() => handleBookmark(msg.id, msg.text)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
+                            >
+                              <span className="text-green-700 text-base leading-none shrink-0">🔖</span>
+                              {isBookmarked ? (lang === "ar" ? "إزالة الإشارة" : lang === "fr" ? "Retirer le signet" : "Remove bookmark") : (lang === "ar" ? "وضع إشارة" : lang === "fr" ? "Ajouter un signet" : "Bookmark")}
+                            </button>
+                          )}
+
+                          {isOwn && !isDeleted && (
+                            <button
+                              onClick={() => handleDeleteMsg(msg.id)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 text-sm hover:bg-white/5 transition-colors text-left"
+                            >
+                              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              {t.deleteMsg}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -599,7 +924,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                 ×
               </button>
             </div>
-            <span className="text-green-900 text-xs">Image ready · add a caption below</span>
+            <span className="text-green-900 text-xs">{t.imageReady}</span>
           </div>
         )}
 
@@ -691,22 +1016,22 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
         </div>
       </div>
 
-      {/* Delete confirmation */}
+      {/* Delete room confirmation */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6" onClick={() => setShowDeleteConfirm(false)}>
           <div className="bg-[#111] border border-white/8 rounded-2xl p-6 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-green-300 font-bold text-base mb-2">Delete # {room?.name}?</h3>
+            <h3 className="text-green-300 font-bold text-base mb-2">{t.deleteRoomTitle} # {room?.name}?</h3>
             <p className="text-green-800 text-sm mb-5">{t.deleteRoomConfirm}</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 border border-white/8 text-green-800 rounded-xl text-sm">
-                Cancel
+                {t.cancelDelete}
               </button>
               <button
                 onClick={handleDeleteRoom}
                 disabled={deleting}
                 className="flex-1 py-3 bg-red-900 hover:bg-red-800 text-red-200 rounded-xl text-sm font-semibold disabled:opacity-50"
               >
-                {deleting ? "Deleting..." : "Delete"}
+                {deleting ? t.deleting : t.deleteRoom}
               </button>
             </div>
           </div>
@@ -722,6 +1047,10 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             if (rid) setProfileUid(null);
           }}
         />
+      )}
+
+      {showMembersModal && room && (
+        <MembersModal room={room} onClose={() => setShowMembersModal(false)} />
       )}
     </>
   );

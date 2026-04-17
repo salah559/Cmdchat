@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   collection, addDoc, query, orderBy, onSnapshot,
-  serverTimestamp, Timestamp, doc, updateDoc, limit, arrayUnion, arrayRemove
+  serverTimestamp, Timestamp, doc, updateDoc, limit, arrayUnion, arrayRemove, deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +25,8 @@ export interface Message {
   reactions?: Record<string, string[]>;
   replyTo?: ReplyInfo;
   readBy?: string[];
+  edited?: boolean;
+  deletedAt?: Timestamp | null;
 }
 
 export function useMessages(roomId: string | null) {
@@ -36,7 +38,7 @@ export function useMessages(roomId: string | null) {
     const q = query(
       collection(db, "rooms", roomId, "messages"),
       orderBy("createdAt", "asc"),
-      limit(100)
+      limit(150)
     );
     const unsub = onSnapshot(q, (snap) => {
       setMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Message, "id">) })));
@@ -75,6 +77,18 @@ export function useMessages(roomId: string | null) {
     });
   };
 
+  const editMessage = async (messageId: string, newText: string) => {
+    if (!roomId || !user || !newText.trim()) return;
+    const msgRef = doc(db, "rooms", roomId, "messages", messageId);
+    await updateDoc(msgRef, { text: newText.trim(), edited: true });
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!roomId || !user) return;
+    const msgRef = doc(db, "rooms", roomId, "messages", messageId);
+    await updateDoc(msgRef, { text: "", imageUrl: null, deletedAt: serverTimestamp() });
+  };
+
   const toggleReaction = async (messageId: string, emoji: string) => {
     if (!roomId || !user) return;
     const msgRef = doc(db, "rooms", roomId, "messages", messageId);
@@ -94,5 +108,5 @@ export function useMessages(roomId: string | null) {
     await updateDoc(msgRef, { readBy: arrayUnion(user.uid) });
   };
 
-  return { messages, sendMessage, toggleReaction, markRead };
+  return { messages, sendMessage, editMessage, deleteMessage, toggleReaction, markRead };
 }

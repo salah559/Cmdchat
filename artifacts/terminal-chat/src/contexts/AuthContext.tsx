@@ -3,7 +3,7 @@ import {
   User, onAuthStateChanged, signInWithPopup, signOut,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { auth, googleProvider, db } from "@/lib/firebase";
 
 interface AuthContextType {
@@ -12,6 +12,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (displayName: string, photoURL: string | null, bio?: string) => Promise<void>;
+  updateStatus: (statusText: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -82,8 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const updateStatus = async (statusText: string) => {
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.uid), { statusText });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, updateProfile, updateStatus }}>
       {children}
     </AuthContext.Provider>
   );

@@ -11,10 +11,8 @@ pnpm workspace monorepo using TypeScript. Includes a terminal-style chat app wit
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM (for future use), Firebase Firestore (messages)
+- **Database**: Firebase Firestore (messages)
 - **Auth**: Firebase Google Auth
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Frontend**: React + Vite (terminal-chat artifact)
 
@@ -26,31 +24,83 @@ pnpm workspace monorepo using TypeScript. Includes a terminal-style chat app wit
 - **Design**: Terminal/CMD aesthetic — black background, green monospace text
 - **Auth**: Firebase Google Sign-In
 - **Database**: Firebase Firestore (messages collection)
-- **Deploy**: Vercel-ready with `vercel.json` (functions + rewrites config)
-- **Language**: Arabic/English via `LanguageContext` (localStorage persisted, RTL support)
-- **Settings**: SettingsModal with account editing (name, photo, bio) and preferences (language, sound toggle)
-- **Swipe to reply**: Touch swipe left/right on messages to trigger reply (like Instagram)
-- **No native context menu**: `onContextMenu` prevented on messages, only in-app reaction picker shows
+- **Language**: Arabic / English / French via `LanguageContext` (localStorage persisted, RTL support for Arabic)
 
-### Firebase Config
-- **Project**: `chat-6d518`
-- **Config**: embedded in `artifacts/terminal-chat/src/lib/firebase.ts`
-- **Collections**: `messages` (text, uid, displayName, photoURL, createdAt)
+### api-server (Express)
+- **Path**: `artifacts/api-server/`
+- **Preview**: `/api`
+- **Purpose**: Web Push notifications (VAPID), link preview (future)
 
-## Key Commands
+## Firestore Data Model
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
-- `pnpm --filter @workspace/terminal-chat run dev` — run frontend locally
+### rooms/{roomId}
+- `name`, `type` (group/dm), `members[]`, `createdBy`, `createdAt`, `lastMessage`, `lastMessageAt`
+- `description?` — channel description
+- `pinnedMessageId?` — pinned message reference
+- `archived?` — boolean, archived channels hidden from main list
 
-## Vercel Deployment
+### rooms/{roomId}/messages/{msgId}
+- `text`, `imageUrl?`, `uid`, `displayName`, `photoURL`, `createdAt`, `type`
+- `readBy[]` — array of UIDs who have read the message
+- `reactions?` — map of emoji → uid[]
+- `replyTo?` — `{ id, text, displayName, imageUrl? }`
+- `edited?` — boolean, marked true after editing
+- `deletedAt?` — timestamp, set on soft delete
 
-To deploy `terminal-chat` to Vercel:
-1. Root directory: `artifacts/terminal-chat`
-2. Build command: `pnpm run build`
-3. Output directory: `dist/public`
+### users/{uid}
+- `displayName`, `photoURL`, `email`, `bio`, `statusText`
+- `status` (online/offline), `lastSeen`, `joinedAt`
+- `bookmarks?` — map of msgId → { roomId, msgId, text, ts }
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## Features Implemented
+
+### Messaging
+- Send text and images (via ImgBB)
+- Reply to messages (swipe gesture on mobile, reply button)
+- Edit own messages (inline edit with pencil UI)
+- Delete own messages (soft delete with "message deleted" placeholder)
+- Emoji reactions via long-press action sheet (6 quick emojis)
+- @mention detection and highlighting (own mentions highlighted)
+- Link preview in messages (microlink.io API)
+- Message bookmarks (saved to Firestore user doc)
+
+### Channels / Rooms
+- Group channels and Direct Messages
+- Pin a message per channel (banner shown at top)
+- Archive channels (hidden in collapsible section, can unarchive)
+- Delete channel (group creator only)
+- Members list modal with admin actions
+- Channel admin can: kick members, edit channel name/description
+- Per-room message search with highlight
+- Global search across all rooms (by name, description, last message)
+
+### Users
+- Custom status text per user (shown in sidebar and chat header)
+- Online/offline status with live indicator
+- Profile modal with bio, photo upload
+- Push notifications (web-push with VAPID)
+- Typing indicators
+
+### UX
+- 3 languages: Arabic (RTL), English, French
+- Sound effects (message received / sent)
+- Swipe-to-reply on mobile
+- Read receipts (✓ sent, ✓✓ read) for DMs
+- Long-press action sheet: react + reply + edit + pin + bookmark + delete
+
+## Hooks
+
+- `useMessages(roomId)` — subscribe to messages, send/edit/delete/react/markRead
+- `useRooms()` — subscribe to rooms, create/delete/archive/pin/kick/updateRoom
+- `useUsers()` — subscribe to all users with computed online status + statusText
+- `useTyping(roomId)` — typing indicator management
+- `useUnread()` — unread room tracking
+
+## Key Components
+
+- `ChatArea.tsx` — main chat interface with all message features
+- `ConversationList.tsx` — sidebar with channels/DMs/users tabs, global search, archived section
+- `MembersModal.tsx` — channel members list with admin kick/edit actions
+- `GlobalSearch.tsx` — cross-room search modal
+- `LinkPreview.tsx` — URL preview card (microlink.io)
+- `SettingsModal.tsx` — profile edit, custom status, language, sounds

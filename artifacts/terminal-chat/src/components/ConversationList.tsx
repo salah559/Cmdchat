@@ -7,8 +7,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLang } from "@/contexts/LanguageContext";
 import CreateGroupModal from "./CreateGroupModal";
 import ProfileModal from "./ProfileModal";
-import PushTestPanel from "./PushTestPanel";
 import SettingsModal from "./SettingsModal";
+import GlobalSearch from "./GlobalSearch";
 import Avatar from "./Avatar";
 
 interface ConversationListProps {
@@ -20,7 +20,7 @@ type Tab = "channels" | "dms" | "users";
 
 export default function ConversationList({ activeRoomId, onSelectRoom }: ConversationListProps) {
   const { user, logout } = useAuth();
-  const { rooms, openDM } = useRooms();
+  const { rooms, openDM, unarchiveRoom } = useRooms();
   const users = useUsers();
   const { markRead, isUnread } = useUnread();
   const { isDark, toggleTheme } = useTheme();
@@ -30,13 +30,17 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const [dmLoadingUid, setDmLoadingUid] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [profileUid, setProfileUid] = useState<string | null>(null);
-  const [showPushTest, setShowPushTest] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
-  const groupRooms = rooms.filter((r) => r.type === "group");
-  const dmRooms = rooms.filter((r) => r.type === "dm");
+  const activeRooms = rooms.filter((r) => !r.archived);
+  const archivedRooms = rooms.filter((r) => r.archived);
+  const groupRooms = activeRooms.filter((r) => r.type === "group");
+  const dmRooms = activeRooms.filter((r) => r.type === "dm");
   const otherUsers = users.filter((u) => u.uid !== user?.uid);
   const onlineCount = otherUsers.filter((u) => u.status === "online").length;
+  const currentUser = users.find((u) => u.uid === user?.uid);
 
   const safeTop = "env(safe-area-inset-top, 44px)";
 
@@ -125,7 +129,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
 
   return (
     <>
-      <div className="h-full flex flex-col bg-[#0a0a0a]">
+      <div className="h-full flex flex-col bg-[#0a0a0a]" dir={lang === "ar" ? "rtl" : "ltr"}>
 
         {/* Header */}
         <div
@@ -137,14 +141,32 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               onClick={() => setProfileUid(user!.uid)}
               className="flex items-center gap-2.5 active:opacity-70 transition-opacity min-w-0"
             >
-              <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
+              <div className="relative shrink-0">
+                <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0a0a0a] bg-green-500" />
+              </div>
               <div className="text-left min-w-0">
                 <p className="text-green-300 font-semibold text-sm leading-tight truncate max-w-[120px]">{user?.displayName}</p>
-                <p className="text-green-600 text-xs">● {t.online2}</p>
+                {currentUser?.statusText ? (
+                  <p className="text-green-700 text-xs truncate max-w-[120px]">{currentUser.statusText}</p>
+                ) : (
+                  <p className="text-green-600 text-xs">● {t.online2}</p>
+                )}
               </div>
             </button>
 
             <div className="flex items-center gap-1 shrink-0">
+              {/* Global search */}
+              <button
+                onClick={() => setShowGlobalSearch(true)}
+                title={t.globalSearch}
+                className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+
               {/* Settings */}
               <button
                 onClick={() => setShowSettings(true)}
@@ -254,7 +276,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
           {/* Channels */}
           {tab === "channels" && (
             <div>
-              {filteredGroups.length === 0 ? (
+              {filteredGroups.length === 0 && archivedRooms.filter((r) => r.type === "group").length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-green-900 px-6 text-center">
                   <div className="w-14 h-14 rounded-2xl bg-green-900/20 border border-green-900/30 flex items-center justify-center mb-4">
                     <span className="text-green-700 text-2xl font-bold font-mono">#</span>
@@ -269,32 +291,80 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                   </button>
                 </div>
               ) : (
-                filteredGroups.map((room) => {
-                  const unread = isUnread(room.id, room.lastMessageAt) && room.id !== activeRoomId;
-                  return (
-                    <button
-                      key={room.id}
-                      onClick={() => handleSelectRoom(room.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/3 transition-colors active:bg-green-950/20 ${
-                        activeRoomId === room.id ? "bg-green-950/15 border-l-2 border-l-green-600" : ""
-                      }`}
-                    >
-                      <div className="w-11 h-11 rounded-2xl bg-green-900/25 border border-green-800/30 flex items-center justify-center shrink-0 relative">
-                        <span className="text-green-600 font-bold text-lg font-mono">#</span>
-                        {unread && (
-                          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-500 border-2 border-[#0a0a0a]" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{room.name}</span>
-                          <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
+                <>
+                  {filteredGroups.map((room) => {
+                    const unread = isUnread(room.id, room.lastMessageAt) && room.id !== activeRoomId;
+                    return (
+                      <button
+                        key={room.id}
+                        onClick={() => handleSelectRoom(room.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/3 transition-colors active:bg-green-950/20 ${
+                          activeRoomId === room.id ? "bg-green-950/15 border-l-2 border-l-green-600" : ""
+                        }`}
+                      >
+                        <div className="w-11 h-11 rounded-2xl bg-green-900/25 border border-green-800/30 flex items-center justify-center shrink-0 relative">
+                          <span className="text-green-600 font-bold text-lg font-mono">#</span>
+                          {unread && (
+                            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-500 border-2 border-[#0a0a0a]" />
+                          )}
                         </div>
-                        <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>{room.lastMessage || t.noMessages2}</div>
-                      </div>
-                    </button>
-                  );
-                })
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{room.name}</span>
+                            <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
+                          </div>
+                          <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>
+                            {room.description ? (
+                              <span className="text-green-900 text-[10px]">{room.description}</span>
+                            ) : (
+                              room.lastMessage || t.noMessages2
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                  {/* Archived channels section */}
+                  {archivedRooms.filter((r) => r.type === "group").length > 0 && (
+                    <div>
+                      <button
+                        onClick={() => setShowArchived(!showArchived)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-green-900 hover:text-green-700 text-xs transition-colors border-b border-white/3"
+                      >
+                        <svg
+                          className={`w-3 h-3 transition-transform ${showArchived ? "rotate-90" : ""}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                        {t.archivedChannels} ({archivedRooms.filter((r) => r.type === "group").length})
+                      </button>
+                      {showArchived && archivedRooms.filter((r) => r.type === "group").map((room) => (
+                        <div
+                          key={room.id}
+                          className="flex items-center gap-3 px-4 py-3 border-b border-white/3 bg-white/2"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-green-900/15 border border-green-900/20 flex items-center justify-center shrink-0">
+                            <span className="text-green-900 font-bold text-sm font-mono">#</span>
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <span className="text-green-800 text-sm truncate">{room.name}</span>
+                          </div>
+                          <button
+                            onClick={() => unarchiveRoom(room.id)}
+                            className="text-green-900 hover:text-green-600 text-xs px-2 py-1 border border-green-900/30 rounded-lg transition-colors shrink-0"
+                          >
+                            {t.unarchiveChannel}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -340,12 +410,11 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                           <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{other?.displayName ?? t.unknown}</span>
                           <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
                         </div>
-                        <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>
-                          {room.lastMessage || t.startConversation}
-                        </div>
-                        {other?.status !== "online" && other?.lastSeen && (
-                          <div className="text-green-900 text-[10px] mt-0.5">
-                            {t.lastSeen} {formatLastSeen(other.lastSeen)}
+                        {other?.statusText ? (
+                          <div className="text-green-700 text-xs truncate mt-0.5">{other.statusText}</div>
+                        ) : (
+                          <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>
+                            {room.lastMessage || t.startConversation}
                           </div>
                         )}
                       </div>
@@ -381,9 +450,13 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
 
                     <button onClick={() => setProfileUid(u.uid)} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
                       <div className="text-green-300 font-semibold text-sm truncate">{u.displayName}</div>
-                      <div className={`text-xs mt-0.5 ${u.status === "online" ? "text-green-600" : "text-green-900"}`}>
-                        {u.status === "online" ? `● ${t.online2}` : `○ ${formatLastSeen(u.lastSeen)}`}
-                      </div>
+                      {u.statusText ? (
+                        <div className="text-green-700 text-xs mt-0.5 truncate">{u.statusText}</div>
+                      ) : (
+                        <div className={`text-xs mt-0.5 ${u.status === "online" ? "text-green-600" : "text-green-900"}`}>
+                          {u.status === "online" ? `● ${t.online2}` : `○ ${formatLastSeen(u.lastSeen)}`}
+                        </div>
+                      )}
                     </button>
 
                     <button
@@ -427,8 +500,14 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
         />
       )}
 
-      {showPushTest && <PushTestPanel onClose={() => setShowPushTest(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
+      {showGlobalSearch && (
+        <GlobalSearch
+          onSelectRoom={(id) => { handleSelectRoom(id); }}
+          onClose={() => setShowGlobalSearch(false)}
+        />
+      )}
     </>
   );
 }

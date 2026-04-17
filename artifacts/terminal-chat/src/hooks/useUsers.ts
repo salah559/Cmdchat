@@ -8,6 +8,7 @@ export interface ChatUser {
   photoURL: string | null;
   email: string | null;
   bio?: string;
+  statusText?: string;
   status: "online" | "offline";
   lastSeen: Timestamp | null;
   joinedAt: Timestamp | null;
@@ -32,6 +33,7 @@ export function useUsers() {
           photoURL: data.photoURL ?? null,
           email: data.email ?? null,
           bio: data.bio ?? "",
+          statusText: data.statusText ?? "",
           status,
           lastSeen,
           joinedAt: data.joinedAt ?? null,
