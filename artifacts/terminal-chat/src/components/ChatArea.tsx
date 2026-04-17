@@ -46,6 +46,17 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevMsgCount = useRef(0);
 
+  const SWIPE_THRESHOLD = 64;
+  const swipeState = useRef<{
+    msgId: string;
+    startX: number;
+    startY: number;
+    isOwn: boolean;
+    triggered: boolean;
+    bubbleEl: HTMLElement | null;
+    iconEl: HTMLElement | null;
+  } | null>(null);
+
   const room: Room | undefined = rooms.find((r) => r.id === roomId);
   const isGroupCreator = room?.type === "group" && room.createdBy === user?.uid;
 
@@ -173,6 +184,46 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
       longPressTimer.current = null;
     }
   }, []);
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent, msgId: string, isOwn: boolean) => {
+    const row = e.currentTarget as HTMLElement;
+    const bubbleEl = row.querySelector<HTMLElement>("[data-bubble]");
+    const iconEl = row.querySelector<HTMLElement>("[data-swipe-icon]");
+    swipeState.current = { msgId, startX: e.touches[0].clientX, startY: e.touches[0].clientY, isOwn, triggered: false, bubbleEl, iconEl };
+  }, []);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent) => {
+    const state = swipeState.current;
+    if (!state) return;
+    const dx = e.touches[0].clientX - state.startX;
+    const dy = e.touches[0].clientY - state.startY;
+    if (Math.abs(dy) > Math.abs(dx) + 6 && Math.abs(dx) < 12) { swipeState.current = null; return; }
+    const validDir = state.isOwn ? dx < 0 : dx > 0;
+    if (!validDir) return;
+    const capped = state.isOwn
+      ? Math.max(dx, -SWIPE_THRESHOLD * 1.3)
+      : Math.min(dx, SWIPE_THRESHOLD * 1.3);
+    if (state.bubbleEl) { state.bubbleEl.style.transform = `translateX(${capped}px)`; state.bubbleEl.style.transition = "none"; }
+    const progress = Math.min(Math.abs(capped) / SWIPE_THRESHOLD, 1);
+    if (state.iconEl) { state.iconEl.style.opacity = String(progress); state.iconEl.style.transform = `scale(${0.5 + progress * 0.5})`; state.iconEl.style.transition = "none"; }
+    if (!state.triggered && Math.abs(capped) >= SWIPE_THRESHOLD) {
+      state.triggered = true;
+      if ("vibrate" in navigator) navigator.vibrate(25);
+      handleLongPressEnd();
+    }
+  }, [handleLongPressEnd]);
+
+  const handleSwipeEnd = useCallback(() => {
+    const state = swipeState.current;
+    if (!state) return;
+    if (state.triggered) {
+      const msg = messages.find((m) => m.id === state.msgId);
+      if (msg) { setReplyTo({ id: msg.id, text: msg.text, displayName: msg.displayName, imageUrl: msg.imageUrl }); setTimeout(() => inputRef.current?.focus(), 50); }
+    }
+    if (state.bubbleEl) { state.bubbleEl.style.transition = "transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)"; state.bubbleEl.style.transform = "translateX(0)"; }
+    if (state.iconEl) { state.iconEl.style.transition = "opacity 0.25s, transform 0.25s"; state.iconEl.style.opacity = "0"; state.iconEl.style.transform = "scale(0.5)"; }
+    swipeState.current = null;
+  }, [messages]);
 
   const handleReply = (msg: { id: string; text: string; displayName: string; imageUrl?: string }) => {
     setReplyTo({ id: msg.id, text: msg.text, displayName: msg.displayName, imageUrl: msg.imageUrl });
@@ -375,11 +426,27 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                 )}
 
                 <div
-                  className={`flex items-end gap-1.5 ${isOwn ? "flex-row-reverse" : "flex-row"} ${isGroupStart ? "mt-3" : "mt-0.5"}`}
+                  className={`flex items-end gap-1.5 ${isOwn ? "flex-row-reverse" : "flex-row"} ${isGroupStart ? "mt-3" : "mt-0.5"} relative select-none`}
                   onPointerDown={() => handleLongPressStart(msg.id)}
                   onPointerUp={handleLongPressEnd}
                   onPointerLeave={handleLongPressEnd}
+                  onTouchStart={(e) => handleSwipeStart(e, msg.id, isOwn)}
+                  onTouchMove={handleSwipeMove}
+                  onTouchEnd={handleSwipeEnd}
+                  onTouchCancel={handleSwipeEnd}
+                  onContextMenu={(e) => e.preventDefault()}
                 >
+                  {/* Swipe-to-reply icon */}
+                  <div
+                    data-swipe-icon
+                    className={`absolute ${isOwn ? "left-1" : "right-1"} top-1/2 -translate-y-1/2 text-green-500 pointer-events-none z-10`}
+                    style={{ opacity: 0, transform: "scale(0.5)" }}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                  </div>
+
                   {/* Avatar in group */}
                   {!isOwn && room?.type === "group" && (
                     <div className="w-7 shrink-0 self-end mb-1">
@@ -391,7 +458,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                     </div>
                   )}
 
-                  <div className={`flex flex-col ${isOwn ? "items-end" : "items-start"} max-w-[78%] relative group`}>
+                  <div data-bubble className={`flex flex-col ${isOwn ? "items-end" : "items-start"} max-w-[78%] relative group`}>
                     {isGroupStart && !isOwn && room?.type === "group" && (
                       <button
                         onClick={() => setProfileUid(msg.uid)}
