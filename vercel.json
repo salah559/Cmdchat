@@ -3,8 +3,9 @@
   "outputDirectory": "artifacts/terminal-chat/dist/public",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": null,
-  "rewrites": [
-    { "source": "/:path*", "destination": "/index.html" }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "functions": {
     "api/**/*.ts": {
