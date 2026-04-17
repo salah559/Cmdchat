@@ -5,6 +5,7 @@ import { useRooms, Room } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
 import { useTyping } from "@/hooks/useTyping";
 import { usePushNotifications } from "@/contexts/PushNotificationContext";
+import { useLang } from "@/contexts/LanguageContext";
 import { uploadImageToImgbb } from "@/lib/imgbb";
 import { playMessageSound, playSentSound, isSoundEnabled } from "@/lib/sounds";
 import Avatar from "./Avatar";
@@ -26,6 +27,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const { messages, sendMessage, toggleReaction, markRead } = useMessages(roomId);
   const { typingUsers, setTyping, clearTyping } = useTyping(roomId);
   const { notifyMembers } = usePushNotifications();
+  const { t } = useLang();
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -239,10 +241,10 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     if (!ts) return "";
     const d = ts.toDate();
     const now = new Date();
-    if (d.toDateString() === now.toDateString()) return "Today";
+    if (d.toDateString() === now.toDateString()) return t.today;
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    if (d.toDateString() === yesterday.toDateString()) return t.yesterday;
     return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   };
 
@@ -256,10 +258,10 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           <span className="text-green-500 text-4xl font-bold font-mono">TC</span>
         </div>
         <h2 className="text-green-300 font-bold text-xl mb-2 font-mono">TermChat</h2>
-        <p className="text-green-800 text-sm max-w-xs leading-relaxed">Select a channel or conversation from the sidebar to start messaging</p>
+        <p className="text-green-800 text-sm max-w-xs leading-relaxed">{t.selectRoom}</p>
         <div className="flex items-center gap-2 mt-6 text-green-900 text-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-green-900"></span>
-          <span>End-to-end · Real-time · Firebase</span>
+          <span>{t.endToEnd}</span>
           <span className="w-1.5 h-1.5 rounded-full bg-green-900"></span>
         </div>
       </div>
@@ -320,7 +322,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                 {otherUser.status === "online" ? "Online" : "Offline"}
               </div>
             ) : room?.type === "group" ? (
-              <div className="text-green-900 text-xs">{room.members.length} members</div>
+              <div className="text-green-900 text-xs">{room.members.length} {t.members}</div>
             ) : null}
           </button>
 
@@ -357,11 +359,11 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search messages..."
+              placeholder={t.search}
               className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-800 text-sm"
             />
             {searchQuery && (
-              <span className="text-green-900 text-xs shrink-0">{filteredMessages.length} result{filteredMessages.length !== 1 ? "s" : ""}</span>
+              <span className="text-green-900 text-xs shrink-0">{filteredMessages.length} {filteredMessages.length !== 1 ? t.searchResultsPlural : t.searchResults}</span>
             )}
             <button onClick={() => { setSearchOpen(false); setSearchQuery(""); }} className="text-green-800 hover:text-green-500 transition-colors shrink-0">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,13 +377,13 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
         <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
           {filteredMessages.length === 0 && !searchQuery && (
             <div className="flex flex-col items-center justify-center h-full text-green-900 text-sm py-10">
-              <p>No messages yet</p>
-              <p className="text-xs mt-1">Send the first message!</p>
+              <p>{t.noMessages}</p>
+              <p className="text-xs mt-1">{t.sendFirst}</p>
             </div>
           )}
           {filteredMessages.length === 0 && searchQuery && (
             <div className="flex flex-col items-center justify-center h-full text-green-900 text-sm py-10">
-              <p>No messages found for "{searchQuery}"</p>
+              <p>{t.noResults} "{searchQuery}"</p>
             </div>
           )}
 
@@ -573,7 +575,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             <div className="flex items-center gap-2 mt-3 ml-1">
               <div className="flex items-center gap-1 bg-[#1c1c1c] border border-white/5 rounded-2xl rounded-bl-sm px-3 py-2">
                 <span className="text-green-700 text-xs mr-1">
-                  {typingUsers.length === 1 ? typingUsers[0] : `${typingUsers.length} people`} typing
+                  {typingUsers.length === 1 ? typingUsers[0] : `${typingUsers.length} ${t.people}`} {t.typing}
                 </span>
                 <span className="typing-dot w-1.5 h-1.5 rounded-full bg-green-600 inline-block" />
                 <span className="typing-dot w-1.5 h-1.5 rounded-full bg-green-600 inline-block" />
@@ -659,7 +661,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                 value={input}
                 onChange={handleInputChange}
                 disabled={sending}
-                placeholder={replyTo ? `Reply to ${replyTo.displayName}...` : previewImage ? "Add caption..." : "Message..."}
+                placeholder={replyTo ? `${t.replyPlaceholder} ${replyTo.displayName}...` : previewImage ? t.captionPlaceholder : t.messagePlaceholder}
                 className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-[15px] min-w-0"
                 autoComplete="off"
                 autoCapitalize="sentences"
@@ -694,7 +696,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6" onClick={() => setShowDeleteConfirm(false)}>
           <div className="bg-[#111] border border-white/8 rounded-2xl p-6 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-green-300 font-bold text-base mb-2">Delete # {room?.name}?</h3>
-            <p className="text-green-800 text-sm mb-5">All messages will be permanently deleted. This cannot be undone.</p>
+            <p className="text-green-800 text-sm mb-5">{t.deleteRoomConfirm}</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 border border-white/8 text-green-800 rounded-xl text-sm">
                 Cancel

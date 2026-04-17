@@ -26,7 +26,11 @@ pnpm workspace monorepo using TypeScript. Includes a terminal-style chat app wit
 - **Design**: Terminal/CMD aesthetic — black background, green monospace text
 - **Auth**: Firebase Google Sign-In
 - **Database**: Firebase Firestore (messages collection)
-- **Deploy**: Vercel-ready with `vercel.json`
+- **Deploy**: Vercel-ready with `vercel.json` (functions + rewrites config)
+- **Language**: Arabic/English via `LanguageContext` (localStorage persisted, RTL support)
+- **Settings**: SettingsModal with account editing (name, photo, bio) and preferences (language, sound toggle)
+- **Swipe to reply**: Touch swipe left/right on messages to trigger reply (like Instagram)
+- **No native context menu**: `onContextMenu` prevented on messages, only in-app reaction picker shows
 
 ### Firebase Config
 - **Project**: `chat-6d518`
