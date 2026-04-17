@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
+import { useLang } from "@/contexts/LanguageContext";
 import { uploadImageToImgbb } from "@/lib/imgbb";
 import Avatar from "./Avatar";
 
@@ -13,6 +14,7 @@ interface ProfileModalProps {
 export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileModalProps) {
   const { user, updateProfile } = useAuth();
   const users = useUsers();
+  const { t, lang } = useLang();
   const profile = users.find((u) => u.uid === uid);
   const isOwn = user?.uid === uid;
 
@@ -43,15 +45,16 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
       const url = await uploadImageToImgbb(file);
       setLocalPhoto(url);
     } catch {
-      alert("Failed to upload photo. Try again.");
+      alert(t.failedUploadPhoto);
     } finally {
       setUploadingPhoto(false);
     }
   };
 
   const formatDate = (ts: { toDate: () => Date } | null) => {
-    if (!ts) return "Unknown";
-    return ts.toDate().toLocaleDateString("en-US", { year: "numeric", month: "long" });
+    if (!ts) return t.unknown;
+    const locale = lang === "ar" ? "ar-SA" : lang === "fr" ? "fr-FR" : "en-US";
+    return ts.toDate().toLocaleDateString(locale, { year: "numeric", month: "long" });
   };
 
   return (
@@ -62,15 +65,13 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
       <div
         className="w-full sm:max-w-sm bg-[#111] border border-white/8 rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        dir={lang === "ar" ? "rtl" : "ltr"}
       >
-        {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-0 sm:hidden">
           <div className="w-10 h-1 bg-white/15 rounded-full" />
         </div>
 
-        {/* Header gradient area */}
         <div className="bg-gradient-to-b from-green-950/30 to-transparent px-5 pt-6 pb-4 flex flex-col items-center">
-          {/* Avatar */}
           <div className="relative mb-3">
             {editing ? (
               <button
@@ -104,13 +105,11 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
                 <Avatar name={profile?.displayName} photoURL={displayPhoto} size="lg" />
               </div>
             )}
-            {/* Status dot */}
             {!editing && (
               <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-[#111] ${profile?.status === "online" ? "bg-green-500" : "bg-gray-600"}`} />
             )}
           </div>
 
-          {/* Name */}
           {editing ? (
             <input
               type="text"
@@ -124,53 +123,47 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
             <h2 className="text-green-200 font-bold text-xl text-center">{profile?.displayName}</h2>
           )}
 
-          {/* Status */}
           {!editing && (
             <p className={`text-xs mt-1 ${profile?.status === "online" ? "text-green-500" : "text-green-900"}`}>
-              {profile?.status === "online" ? "● Online" : "● Offline"}
+              {profile?.status === "online" ? `● ${t.online2}` : `● ${t.offline}`}
             </p>
           )}
         </div>
 
-        {/* Info section */}
         <div className="px-5 pb-2 space-y-3">
-          {/* Bio */}
           <div>
-            <label className="text-green-900 text-xs uppercase tracking-wider">About</label>
+            <label className="text-green-900 text-xs uppercase tracking-wider">{t.bio}</label>
             {editing ? (
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 maxLength={120}
                 rows={2}
-                placeholder="Write something about yourself..."
+                placeholder={t.bioPlaceholder}
                 className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-green-300 text-sm outline-none focus:border-green-700 resize-none placeholder-green-900"
               />
             ) : (
               <p className="text-green-700 text-sm mt-1 min-h-[1.5rem]">
-                {profile?.bio || (isOwn ? "No bio yet. Tap edit to add one." : "No bio.")}
+                {profile?.bio || (isOwn ? t.noBioOwn : t.noBio)}
               </p>
             )}
           </div>
 
-          {/* Email (own only) */}
           {isOwn && !editing && (
             <div>
-              <label className="text-green-900 text-xs uppercase tracking-wider">Email</label>
+              <label className="text-green-900 text-xs uppercase tracking-wider">{t.email}</label>
               <p className="text-green-700 text-sm mt-1">{user?.email}</p>
             </div>
           )}
 
-          {/* Member since */}
           {!editing && (
             <div>
-              <label className="text-green-900 text-xs uppercase tracking-wider">Member since</label>
+              <label className="text-green-900 text-xs uppercase tracking-wider">{t.memberSince}</label>
               <p className="text-green-700 text-sm mt-1">{formatDate(profile?.joinedAt ?? null)}</p>
             </div>
           )}
         </div>
 
-        {/* Action buttons */}
         <div className="px-5 py-4 space-y-2">
           {isOwn ? (
             editing ? (
@@ -179,14 +172,14 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
                   onClick={() => { setEditing(false); setLocalPhoto(null); setName(profile?.displayName ?? ""); setBio(profile?.bio ?? ""); }}
                   className="flex-1 py-3 border border-white/8 text-green-800 rounded-xl text-sm transition-colors hover:text-green-600"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving || !name.trim()}
                   className="flex-1 py-3 bg-green-700 hover:bg-green-600 text-black font-semibold rounded-xl text-sm transition-all active:scale-[0.98] disabled:opacity-40"
                 >
-                  {saving ? "Saving..." : "Save"}
+                  {saving ? t.saving : t.saveProfile}
                 </button>
               </div>
             ) : (
@@ -194,7 +187,7 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
                 onClick={() => setEditing(true)}
                 className="w-full py-3 bg-white/5 hover:bg-white/8 border border-white/8 text-green-400 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
               >
-                Edit Profile
+                {t.editProfile}
               </button>
             )
           ) : (
@@ -202,7 +195,7 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
               onClick={() => { onClose(); onSendMessage?.(uid); }}
               className="w-full py-3 bg-green-700 hover:bg-green-600 text-black font-semibold rounded-xl text-sm transition-all active:scale-[0.98]"
             >
-              Send Message
+              {t.sendMessage}
             </button>
           )}
 
@@ -210,7 +203,7 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
             onClick={onClose}
             className="w-full py-2.5 text-green-900 text-sm transition-colors hover:text-green-700"
           >
-            Close
+            {t.close}
           </button>
         </div>
       </div>

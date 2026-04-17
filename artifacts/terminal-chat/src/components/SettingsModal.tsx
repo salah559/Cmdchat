@@ -215,22 +215,23 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               {/* Language */}
               <div>
                 <label className="text-green-900 text-xs uppercase tracking-wider block mb-3">{t.chooseLanguage}</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {LANGUAGES.map((lng) => (
-                    <button
-                      key={lng.code}
-                      onClick={() => handleLangChange(lng.code)}
-                      className={`py-3 rounded-xl text-sm font-semibold border transition-all active:scale-[0.98] ${
-                        lang === lng.code
-                          ? "bg-green-900/40 border-green-700 text-green-300"
-                          : "bg-white/5 border-white/8 text-green-800 hover:text-green-600 hover:border-green-900"
-                      }`}
-                    >
-                      <span className="block text-base mb-0.5">{lng.flag}</span>
-                      <span className="text-xs">{lng.label(t)}</span>
-                      {lang === lng.code && <span className="block text-[10px] text-green-600 mt-0.5">✓</span>}
-                    </button>
-                  ))}
+                <div className="relative">
+                  <select
+                    value={lang}
+                    onChange={(e) => handleLangChange(e.target.value as import("@/contexts/LanguageContext").Lang)}
+                    className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-green-300 text-sm outline-none focus:border-green-700 cursor-pointer transition-colors"
+                  >
+                    {LANGUAGES.map((lng) => (
+                      <option key={lng.code} value={lng.code} className="bg-[#111] text-green-300">
+                        {lng.flag} {lng.label(t)}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 end-3 flex items-center">
+                    <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </div>
               </div>
 

@@ -24,7 +24,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const users = useUsers();
   const { markRead, isUnread } = useUnread();
   const { isDark, toggleTheme } = useTheme();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [tab, setTab] = useState<Tab>("channels");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [dmLoadingUid, setDmLoadingUid] = useState<string | null>(null);
@@ -65,20 +65,22 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
     if (!ts) return "";
     const d = ts.toDate();
     const now = new Date();
+    const locale = lang === "ar" ? "ar-SA" : lang === "fr" ? "fr-FR" : "en-US";
     if (d.toDateString() === now.toDateString())
-      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+    return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
   };
 
   const formatLastSeen = (ts: { toDate: () => Date } | null): string => {
-    if (!ts) return "Offline";
+    if (!ts) return t.offline;
     const diff = Date.now() - ts.toDate().getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "Just now";
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) return t.justNow;
+    if (mins < 60) return `${mins}${t.minsAgo}`;
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const locale = lang === "ar" ? "ar-SA" : lang === "fr" ? "fr-FR" : "en-US";
+    if (hours < 24) return `${hours}${t.hoursAgo}`;
+    return ts.toDate().toLocaleDateString(locale, { month: "short", day: "numeric" });
   };
 
   const filteredGroups = groupRooms.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()));
@@ -91,7 +93,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     {
       key: "channels",
-      label: "Channels",
+      label: t.channels,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
@@ -101,7 +103,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
     },
     {
       key: "dms",
-      label: "Messages",
+      label: t.directMessages,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -111,7 +113,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
     },
     {
       key: "users",
-      label: "People",
+      label: t.users,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -138,7 +140,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
               <div className="text-left min-w-0">
                 <p className="text-green-300 font-semibold text-sm leading-tight truncate max-w-[120px]">{user?.displayName}</p>
-                <p className="text-green-600 text-xs">● Online</p>
+                <p className="text-green-600 text-xs">● {t.online2}</p>
               </div>
             </button>
 
@@ -158,7 +160,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               {/* Theme toggle */}
               <button
                 onClick={toggleTheme}
-                title={isDark ? "Light mode" : "Dark mode"}
+                title={isDark ? t.lightMode : t.darkMode}
                 className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
               >
                 {isDark ? (
@@ -176,7 +178,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               {tab === "channels" && (
                 <button
                   onClick={() => setShowCreateGroup(true)}
-                  title="New channel"
+                  title={t.newChannelTitle}
                   className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +190,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               {/* Logout */}
               <button
                 onClick={logout}
-                title="Sign out"
+                title={t.signOut}
                 className="w-8 h-8 flex items-center justify-center text-red-900 hover:text-red-500 border border-red-900/30 hover:border-red-800/50 rounded-xl transition-all active:scale-95"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,7 +209,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
+              placeholder={t.searchPlaceholder}
               className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-sm"
             />
             {search && (
@@ -257,13 +259,13 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                   <div className="w-14 h-14 rounded-2xl bg-green-900/20 border border-green-900/30 flex items-center justify-center mb-4">
                     <span className="text-green-700 text-2xl font-bold font-mono">#</span>
                   </div>
-                  <p className="text-sm font-medium text-green-800">No channels yet</p>
-                  <p className="text-xs mt-1 mb-4">Create a channel to start a group conversation</p>
+                  <p className="text-sm font-medium text-green-800">{t.noChannelsYet}</p>
+                  <p className="text-xs mt-1 mb-4">{t.createChannelDesc}</p>
                   <button
                     onClick={() => setShowCreateGroup(true)}
                     className="px-5 py-2.5 border border-green-900/60 text-green-700 text-sm hover:text-green-500 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
                   >
-                    Create channel
+                    {t.createChannel}
                   </button>
                 </div>
               ) : (
@@ -288,7 +290,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                           <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{room.name}</span>
                           <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
                         </div>
-                        <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>{room.lastMessage || "No messages yet"}</div>
+                        <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>{room.lastMessage || t.noMessages2}</div>
                       </div>
                     </button>
                   );
@@ -307,8 +309,8 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                   </div>
-                  <p className="text-sm font-medium text-green-800">No direct messages yet</p>
-                  <p className="text-xs mt-1">Go to the People tab to start a conversation</p>
+                  <p className="text-sm font-medium text-green-800">{t.noDirectMessages}</p>
+                  <p className="text-xs mt-1">{t.goToPeople}</p>
                 </div>
               ) : (
                 filteredDMs.map((room) => {
@@ -335,15 +337,15 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center justify-between gap-2">
-                          <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{other?.displayName ?? "Unknown"}</span>
+                          <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{other?.displayName ?? t.unknown}</span>
                           <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
                         </div>
                         <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>
-                          {room.lastMessage || "Start a conversation"}
+                          {room.lastMessage || t.startConversation}
                         </div>
                         {other?.status !== "online" && other?.lastSeen && (
                           <div className="text-green-900 text-[10px] mt-0.5">
-                            Last seen {formatLastSeen(other.lastSeen)}
+                            {t.lastSeen} {formatLastSeen(other.lastSeen)}
                           </div>
                         )}
                       </div>
@@ -359,11 +361,11 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
             <div>
               <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/3">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_4px_#22c55e]" />
-                <span className="text-green-800 text-xs">{onlineCount} online · {otherUsers.length} total</span>
+                <span className="text-green-800 text-xs">{onlineCount} {t.online} · {otherUsers.length} {t.total}</span>
               </div>
               {filteredUsers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-green-900 px-6 text-center">
-                  <p className="text-sm font-medium text-green-800">No other users yet</p>
+                  <p className="text-sm font-medium text-green-800">{t.noOtherUsers}</p>
                 </div>
               ) : (
                 filteredUsers.map((u) => (
@@ -380,7 +382,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                     <button onClick={() => setProfileUid(u.uid)} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
                       <div className="text-green-300 font-semibold text-sm truncate">{u.displayName}</div>
                       <div className={`text-xs mt-0.5 ${u.status === "online" ? "text-green-600" : "text-green-900"}`}>
-                        {u.status === "online" ? "● Online" : `○ ${formatLastSeen(u.lastSeen)}`}
+                        {u.status === "online" ? `● ${t.online2}` : `○ ${formatLastSeen(u.lastSeen)}`}
                       </div>
                     </button>
 

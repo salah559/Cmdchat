@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRooms } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LanguageContext";
 import Avatar from "./Avatar";
 
 interface CreateGroupModalProps {
@@ -13,6 +14,7 @@ export default function CreateGroupModal({ onClose, onCreated }: CreateGroupModa
   const { user } = useAuth();
   const { createGroup } = useRooms();
   const users = useUsers();
+  const { t, lang } = useLang();
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,15 +30,15 @@ export default function CreateGroupModal({ onClose, onCreated }: CreateGroupModa
 
   const handleCreate = async () => {
     const trimmed = name.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!trimmed) { setError("Channel name is required"); return; }
-    if (trimmed.length < 2) { setError("Name must be at least 2 characters"); return; }
+    if (!trimmed) { setError(t.channelRequired); return; }
+    if (trimmed.length < 2) { setError(t.channelTooShort); return; }
     setLoading(true);
     setError("");
     try {
       const roomId = await createGroup(trimmed, selected);
       onCreated(roomId);
     } catch {
-      setError("Failed to create channel. Try again.");
+      setError(t.failedCreateChannel);
     } finally {
       setLoading(false);
     }
@@ -47,14 +49,14 @@ export default function CreateGroupModal({ onClose, onCreated }: CreateGroupModa
       <div
         className="w-full sm:max-w-md bg-[#111] border border-white/10 rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        dir={lang === "ar" ? "rtl" : "ltr"}
       >
-        {/* Handle bar for mobile */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="w-10 h-1 bg-white/20 rounded-full"></div>
         </div>
 
         <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
-          <h2 className="text-green-300 font-semibold text-base">New Channel</h2>
+          <h2 className="text-green-300 font-semibold text-base">{t.newChannelTitle}</h2>
           <button onClick={onClose} className="text-green-900 hover:text-green-600 transition-colors p-1">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -64,14 +66,14 @@ export default function CreateGroupModal({ onClose, onCreated }: CreateGroupModa
 
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-green-800 text-xs uppercase tracking-wider mb-2 block">Channel Name</label>
+            <label className="text-green-800 text-xs uppercase tracking-wider mb-2 block">{t.channelNameLabel}</label>
             <div className="flex items-center gap-2 bg-white/5 border border-white/8 rounded-xl px-4 py-3 focus-within:border-green-800 transition-colors">
               <span className="text-green-700 font-mono">#</span>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="channel-name"
+                placeholder={t.channelNamePlaceholder}
                 autoFocus
                 className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-sm caret-green-400 font-mono"
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") onClose(); }}
@@ -82,8 +84,8 @@ export default function CreateGroupModal({ onClose, onCreated }: CreateGroupModa
           {otherUsers.length > 0 && (
             <div>
               <label className="text-green-800 text-xs uppercase tracking-wider mb-2 block">
-                Add Members <span className="normal-case">(optional)</span>
-                {selected.length > 0 && <span className="text-green-600 ml-2">{selected.length} selected</span>}
+                {t.addMembers} <span className="normal-case">({t.optional})</span>
+                {selected.length > 0 && <span className="text-green-600 ml-2">{selected.length} {t.selectedCount}</span>}
               </label>
               <div className="space-y-1 max-h-44 overflow-y-auto -mx-1 px-1">
                 {otherUsers.map((u) => {
@@ -124,14 +126,14 @@ export default function CreateGroupModal({ onClose, onCreated }: CreateGroupModa
               onClick={onClose}
               className="flex-1 py-3 border border-white/8 text-green-800 hover:text-green-600 text-sm rounded-xl transition-colors"
             >
-              Cancel
+              {t.cancel}
             </button>
             <button
               onClick={handleCreate}
               disabled={loading || !name.trim()}
               className="flex-1 py-3 bg-green-700 hover:bg-green-600 text-black font-semibold text-sm rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {loading ? "Creating..." : "Create Channel"}
+              {loading ? t.creating : t.createChannelBtn}
             </button>
           </div>
         </div>
