@@ -168,17 +168,10 @@ importers:
         version: 5.9.3
 
   api:
-    dependencies:
-      web-push:
-        specifier: ^3.6.7
-        version: 3.6.7
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
-      '@types/web-push':
-        specifier: ^3.6.4
-        version: 3.6.4
       '@vercel/node':
         specifier: ^5.1.9
         version: 5.7.7(rollup@4.59.0)

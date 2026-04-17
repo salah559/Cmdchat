@@ -3,8 +3,13 @@
   "outputDirectory": "artifacts/terminal-chat/dist/public",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": null,
+  "functions": {
+    "api/ping.js": { "runtime": "@vercel/node@5" },
+    "api/push/notify.js": { "runtime": "@vercel/node@5" }
+  },
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/api/ping", "dest": "/api/ping.js" },
+    { "src": "/api/push/notify", "dest": "/api/push/notify.js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

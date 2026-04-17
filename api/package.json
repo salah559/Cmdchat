@@ -2,12 +2,8 @@
   "name": "@workspace/vercel-api",
   "version": "0.0.0",
   "private": true,
-  "dependencies": {
-    "web-push": "^3.6.7"
-  },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/web-push": "^3.6.4",
     "@vercel/node": "^5.1.9"
   }
 }
