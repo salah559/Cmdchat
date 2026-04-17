@@ -7,6 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { isSoundEnabled, toggleSound } from "@/lib/sounds";
 import CreateGroupModal from "./CreateGroupModal";
 import ProfileModal from "./ProfileModal";
+import PushTestPanel from "./PushTestPanel";
 import Avatar from "./Avatar";
 
 interface ConversationListProps {
@@ -28,6 +29,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const [search, setSearch] = useState("");
   const [profileUid, setProfileUid] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
+  const [showPushTest, setShowPushTest] = useState(false);
 
   const groupRooms = rooms.filter((r) => r.type === "group");
   const dmRooms = rooms.filter((r) => r.type === "dm");
@@ -144,6 +146,17 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
             </button>
 
             <div className="flex items-center gap-1 shrink-0">
+              {/* Push notification test */}
+              <button
+                onClick={() => setShowPushTest(true)}
+                title="اختبار الإشعارات"
+                className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </button>
+
               {/* Sound toggle */}
               <button
                 onClick={handleToggleSound}
@@ -431,6 +444,8 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
           }}
         />
       )}
+
+      {showPushTest && <PushTestPanel onClose={() => setShowPushTest(false)} />}
     </>
   );
 }

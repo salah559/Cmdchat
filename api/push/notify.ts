@@ -24,6 +24,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.error("[Push] VAPID keys missing from environment variables");
+    res.status(500).json({ error: "VAPID keys not configured on server" });
+    return;
+  }
+
   const { subscriptions, notification } = req.body as {
     subscriptions: webpush.PushSubscription[];
     notification: { title: string; body: string; icon?: string; tag?: string; data?: object };
@@ -40,6 +46,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   );
 
   const sent = results.filter((r) => r.status === "fulfilled").length;
-  const failed = results.filter((r) => r.status === "rejected").length;
-  res.json({ sent, failed });
+  const errors = results
+    .filter((r) => r.status === "rejected")
+    .map((r) => (r as PromiseRejectedResult).reason?.message ?? String((r as PromiseRejectedResult).reason));
+
+  if (errors.length > 0) {
+    console.error("[Push] Send errors:", errors);
+  }
+
+  res.json({ sent, failed: errors.length, errors });
 }

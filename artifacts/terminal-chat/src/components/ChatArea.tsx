@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRooms, Room } from "@/hooks/useRooms";
 import { useUsers } from "@/hooks/useUsers";
 import { useTyping } from "@/hooks/useTyping";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { usePushNotifications } from "@/contexts/PushNotificationContext";
 import { uploadImageToImgbb } from "@/lib/imgbb";
 import { playMessageSound, playSentSound, isSoundEnabled } from "@/lib/sounds";
 import Avatar from "./Avatar";
