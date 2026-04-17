@@ -3,10 +3,8 @@ import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
-async function getVapidPublicKey(): Promise<string> {
-  const res = await fetch("/api/push/vapid-key");
-  const data = await res.json();
-  return data.publicKey as string;
+function getVapidPublicKey(): string {
+  return import.meta.env.VITE_VAPID_PUBLIC_KEY ?? "";
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -66,7 +64,7 @@ export function PushNotificationProvider({ children }: { children: ReactNode }) 
         const registration = await navigator.serviceWorker.ready;
 
         setPushStatus("subscribing");
-        const vapidKey = await getVapidPublicKey();
+        const vapidKey = getVapidPublicKey();
         if (!vapidKey) {
           setPushStatus("no-vapid");
           setPushError("VAPID_PUBLIC_KEY not set in Vercel environment variables");
