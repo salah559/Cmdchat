@@ -27,6 +27,8 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
   const fileRef = useRef<HTMLInputElement>(null);
 
   const displayPhoto = localPhoto ?? profile?.photoURL ?? null;
+  const isSpecialUser = profile?.displayName === "bouazza SALAH";
+  const specialBanner = "/ceo-banner.jpg";
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -68,8 +70,17 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
         dir={lang === "ar" ? "rtl" : "ltr"}
       >
         {/* Banner */}
-        <div className="h-28 overflow-hidden relative">
-          {displayPhoto ? (
+        <div className="h-32 overflow-hidden relative">
+          {isSpecialUser ? (
+            <>
+              <img
+                src={specialBanner}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-[#111]" />
+            </>
+          ) : displayPhoto ? (
             <>
               <img
                 src={displayPhoto}
