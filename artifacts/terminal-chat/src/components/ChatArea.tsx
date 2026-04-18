@@ -49,6 +49,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
+  const [deleteMsgConfirm, setDeleteMsgConfirm] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +126,10 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   }, [messages.length]);
 
   useEffect(() => {
-    if (!actionSheet) return;
+    if (!actionSheet) {
+      setDeleteMsgConfirm(null);
+      return;
+    }
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest("[data-action-sheet]")) setActionSheet(null);
@@ -287,9 +291,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     setEditText("");
   };
 
-  const handleDeleteMsg = async (msgId: string) => {
-    if (!confirm(t.confirmDeleteMsg)) return;
-    await deleteMessage(msgId);
+  const handleDeleteMsg = (msgId: string) => {
+    setDeleteMsgConfirm(msgId);
+  };
+
+  const handleDeleteMsgConfirmed = async () => {
+    if (!deleteMsgConfirm) return;
+    await deleteMessage(deleteMsgConfirm);
+    setDeleteMsgConfirm(null);
     setActionSheet(null);
   };
 
@@ -486,6 +495,21 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                   className="absolute end-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl z-30 min-w-[160px] overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
+                  {room?.type === "dm" && (
+                    <button
+                      onClick={async () => {
+                        if (room.archived) await unarchiveRoom(room.id);
+                        else await archiveRoom(room.id);
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-3 text-green-700 text-sm hover:bg-white/5 transition-colors text-left"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      {room.archived ? t.unarchiveChannel : t.archiveChannel}
+                    </button>
+                  )}
                   {isGroupAdmin && room.name !== "general" && (
                     <>
                       <button
@@ -876,15 +900,37 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                           )}
 
                           {isOwn && !isDeleted && (
-                            <button
-                              onClick={() => handleDeleteMsg(msg.id)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 text-sm hover:bg-white/5 transition-colors text-left"
-                            >
-                              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                              {t.deleteMsg}
-                            </button>
+                            deleteMsgConfirm === msg.id ? (
+                              <div className="px-4 py-3 border-t border-white/5">
+                                <p className="text-green-700 text-xs mb-2">
+                                  {lang === "ar" ? "تأكيد حذف الرسالة؟" : lang === "fr" ? "Supprimer ce message ?" : "Delete this message?"}
+                                </p>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={handleDeleteMsgConfirmed}
+                                    className="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/30 transition-colors"
+                                  >
+                                    {lang === "ar" ? "حذف" : lang === "fr" ? "Supprimer" : "Delete"}
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteMsgConfirm(null)}
+                                    className="flex-1 py-1.5 rounded-lg bg-white/5 text-green-700 text-xs hover:bg-white/10 transition-colors"
+                                  >
+                                    {lang === "ar" ? "إلغاء" : lang === "fr" ? "Annuler" : "Cancel"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleDeleteMsg(msg.id)}
+                                className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 text-sm hover:bg-white/5 transition-colors text-left"
+                              >
+                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                {t.deleteMsg}
+                              </button>
+                            )
                           )}
                         </div>
                       </div>
