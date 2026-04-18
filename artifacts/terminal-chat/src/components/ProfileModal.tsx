@@ -4,7 +4,6 @@ import { useUsers } from "@/hooks/useUsers";
 import { useLang } from "@/contexts/LanguageContext";
 import { uploadImageToImgbb } from "@/lib/imgbb";
 import Avatar from "./Avatar";
-import ceoBannerImg from "@assets/dbd79a1f6ab9183f26c8d3e4948b408e_1776479720048.jpg";
 
 interface ProfileModalProps {
   uid: string;
@@ -29,6 +28,7 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
 
   const displayPhoto = localPhoto ?? profile?.photoURL ?? null;
   const isSpecialUser = profile?.displayName?.toLowerCase() === "bouazza salah";
+  const specialBanner = "/ceo-banner.jpg";
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -65,22 +65,20 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
       onClick={onClose}
     >
       <div
-        className={`w-full sm:max-w-sm bg-[#111] rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl ${isSpecialUser ? "border border-amber-700/60" : "border border-white/8"}`}
+        className="w-full sm:max-w-sm bg-[#111] border border-white/8 rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         dir={lang === "ar" ? "rtl" : "ltr"}
       >
-        {/* Banner — top strip only */}
-        <div className="h-32 relative" style={{ overflow: "hidden" }}>
+        {/* Banner */}
+        <div className="h-32 overflow-hidden relative">
           {isSpecialUser ? (
             <>
               <img
-                src={ceoBannerImg}
+                src={specialBanner}
                 alt=""
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50" />
-              {/* Gold bottom border separator */}
-              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-amber-600/70" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-[#111]" />
             </>
           ) : displayPhoto ? (
             <>
@@ -110,7 +108,7 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
               disabled={uploadingPhoto}
               className="relative block"
             >
-              <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl" style={{ border: `3px solid ${isSpecialUser ? "#92400e" : "#111"}` }}>
+              <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl" style={{ border: "3px solid #111" }}>
                 {displayPhoto ? (
                   <img src={displayPhoto} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
@@ -133,7 +131,7 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
             </button>
           ) : (
             <div className="relative">
-              <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl" style={{ border: `3px solid ${isSpecialUser ? "#92400e" : "#111"}` }}>
+              <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl" style={{ border: "3px solid #111" }}>
                 {displayPhoto ? (
                   <img src={displayPhoto} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
