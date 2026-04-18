@@ -844,90 +844,6 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                       </div>
                     )}
 
-                    {/* Action sheet (long-press menu) */}
-                    {actionSheet?.msgId === msg.id && activeAction && (
-                      <div
-                        data-action-sheet
-                        className={`absolute ${isOwn ? "right-0" : "left-0"} -top-[calc(100%+8px)] z-40 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[200px]`}
-                        style={{ bottom: "auto" }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {/* Quick reactions */}
-                        <div className="flex items-center gap-1 px-2 py-2 border-b border-white/5">
-                          {QUICK_EMOJIS.map((emoji) => (
-                            <button
-                              key={emoji}
-                              onClick={() => { toggleReaction(msg.id, emoji); setActionSheet(null); }}
-                              className={`w-9 h-9 flex items-center justify-center text-lg hover:scale-125 transition-transform active:scale-95 rounded-full ${
-                                activeAction.reactions?.[emoji]?.includes(user?.uid ?? "") ? "bg-green-800/40" : ""
-                              }`}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="py-1">
-                          <button
-                            onClick={() => handleReply(msg)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
-                          >
-                            <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                            </svg>
-                            {t.replyMsg}
-                          </button>
-
-                          {isOwn && !isDeleted && (
-                            <button
-                              onClick={() => handleEditStart(msg)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
-                            >
-                              <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              {t.editMsg}
-                            </button>
-                          )}
-
-                          {room?.type === "group" && isGroupAdmin && !isDeleted && (
-                            <button
-                              onClick={() => handlePin(msg.id)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
-                            >
-                              <svg className="w-4 h-4 shrink-0 text-green-700" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
-                              </svg>
-                              {room.pinnedMessageId === msg.id ? t.unpinMsg : t.pinMsg}
-                            </button>
-                          )}
-
-                          {!isDeleted && (
-                            <button
-                              onClick={() => handleBookmark(msg.id, msg.text)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 text-green-300 text-sm hover:bg-white/5 transition-colors text-left"
-                            >
-                              <span className="text-green-700 text-base leading-none shrink-0">🔖</span>
-                              {isBookmarked ? (lang === "ar" ? "إزالة الإشارة" : lang === "fr" ? "Retirer le signet" : "Remove bookmark") : (lang === "ar" ? "وضع إشارة" : lang === "fr" ? "Ajouter un signet" : "Bookmark")}
-                            </button>
-                          )}
-
-                          {isOwn && !isDeleted && (
-                            <button
-                              onClick={() => handleDeleteMsg(msg.id)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 text-sm hover:bg-white/5 transition-colors text-left"
-                            >
-                              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                              {t.deleteMsg}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1054,6 +970,106 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           </form>
         </div>
       </div>
+
+      {/* Action sheet — fixed overlay, outside scroll container */}
+      {actionSheet && activeAction && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          onClick={() => setActionSheet(null)}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            data-action-sheet
+            className="relative w-full max-w-sm mx-3 mb-6 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-white/10" />
+            </div>
+
+            {/* Quick reactions */}
+            <div className="flex items-center justify-around px-3 py-3 border-b border-white/5">
+              {QUICK_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => { toggleReaction(activeAction.id, emoji); setActionSheet(null); }}
+                  className={`w-10 h-10 flex items-center justify-center text-xl active:scale-90 transition-transform rounded-full ${
+                    activeAction.reactions?.[emoji]?.includes(user?.uid ?? "") ? "bg-green-800/40" : ""
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div className="py-1">
+              <button
+                onClick={() => { const m = activeAction; handleReply({ id: m.id, text: m.text, displayName: m.displayName, imageUrl: m.imageUrl }); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors"
+              >
+                <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                {t.replyMsg}
+              </button>
+
+              {actionSheet.isOwn && !activeAction.deletedAt && (
+                <button
+                  onClick={() => handleEditStart(activeAction)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors"
+                >
+                  <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  {t.editMsg}
+                </button>
+              )}
+
+              {room?.type === "group" && isGroupAdmin && !activeAction.deletedAt && (
+                <button
+                  onClick={() => handlePin(activeAction.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors"
+                >
+                  <svg className="w-4 h-4 shrink-0 text-green-700" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+                  </svg>
+                  {room.pinnedMessageId === activeAction.id ? t.unpinMsg : t.pinMsg}
+                </button>
+              )}
+
+              {!activeAction.deletedAt && (
+                <button
+                  onClick={() => handleBookmark(activeAction.id, activeAction.text)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors"
+                >
+                  <span className="text-green-700 text-base leading-none shrink-0">🔖</span>
+                  {bookmarks.has(`${roomId}:${activeAction.id}`)
+                    ? (lang === "ar" ? "إزالة الإشارة" : lang === "fr" ? "Retirer le signet" : "Remove bookmark")
+                    : (lang === "ar" ? "وضع إشارة" : lang === "fr" ? "Ajouter un signet" : "Bookmark")}
+                </button>
+              )}
+
+              {actionSheet.isOwn && !activeAction.deletedAt && (
+                <>
+                  <div className="h-px bg-white/5 mx-4" />
+                  <button
+                    onClick={() => handleDeleteMsg(activeAction.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-red-500 text-sm hover:bg-white/5 transition-colors"
+                  >
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    {t.deleteMsg}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete room confirmation */}
       {showDeleteConfirm && (
