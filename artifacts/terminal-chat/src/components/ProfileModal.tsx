@@ -27,7 +27,7 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
   const fileRef = useRef<HTMLInputElement>(null);
 
   const displayPhoto = localPhoto ?? profile?.photoURL ?? null;
-  const isSpecialUser = profile?.displayName === "bouazza SALAH";
+  const isSpecialUser = profile?.displayName?.toLowerCase() === "bouazza salah";
   const specialBanner = "/ceo-banner.jpg";
 
   const handleSave = async () => {
