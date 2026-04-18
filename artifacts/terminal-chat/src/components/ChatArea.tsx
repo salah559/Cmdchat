@@ -49,9 +49,9 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
-  const [deleteMsgConfirm, setDeleteMsgConfirm] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const msgRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -126,10 +126,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
   }, [messages.length]);
 
   useEffect(() => {
-    if (!actionSheet) {
-      setDeleteMsgConfirm(null);
-      return;
-    }
+    if (!actionSheet) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest("[data-action-sheet]")) setActionSheet(null);
@@ -291,15 +288,19 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     setEditText("");
   };
 
-  const handleDeleteMsg = (msgId: string) => {
-    setDeleteMsgConfirm(msgId);
+  const handleDeleteMsg = async (msgId: string) => {
+    await deleteMessage(msgId);
+    setActionSheet(null);
   };
 
-  const handleDeleteMsgConfirmed = async () => {
-    if (!deleteMsgConfirm) return;
-    await deleteMessage(deleteMsgConfirm);
-    setDeleteMsgConfirm(null);
-    setActionSheet(null);
+  const scrollToPinnedMsg = () => {
+    if (!room?.pinnedMessageId) return;
+    const el = msgRefs.current.get(room.pinnedMessageId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-1", "ring-green-500/50");
+      setTimeout(() => el.classList.remove("ring-1", "ring-green-500/50"), 1500);
+    }
   };
 
   const handlePin = async (msgId: string) => {
@@ -583,10 +584,10 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             <svg className="w-3.5 h-3.5 text-green-700 shrink-0" fill="currentColor" viewBox="0 0 24 24">
               <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
             </svg>
-            <div className="flex-1 min-w-0">
+            <button onClick={scrollToPinnedMsg} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
               <p className="text-green-900 text-[10px]">{t.pinnedMsg}</p>
               <p className="text-green-700 text-xs truncate">{pinnedMsg.text || "📷 Photo"}</p>
-            </div>
+            </button>
             {isGroupAdmin && (
               <button
                 onClick={() => roomId && unpinMessage(roomId)}
@@ -649,7 +650,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             }
 
             return (
-              <div key={msg.id}>
+              <div key={msg.id} ref={(el) => { if (el) msgRefs.current.set(msg.id, el); else msgRefs.current.delete(msg.id); }}>
                 {showDate && (
                   <div className="flex items-center gap-3 my-4">
                     <div className="flex-1 h-px bg-white/5" />
@@ -900,37 +901,15 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                           )}
 
                           {isOwn && !isDeleted && (
-                            deleteMsgConfirm === msg.id ? (
-                              <div className="px-4 py-3 border-t border-white/5">
-                                <p className="text-green-700 text-xs mb-2">
-                                  {lang === "ar" ? "تأكيد حذف الرسالة؟" : lang === "fr" ? "Supprimer ce message ?" : "Delete this message?"}
-                                </p>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={handleDeleteMsgConfirmed}
-                                    className="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/30 transition-colors"
-                                  >
-                                    {lang === "ar" ? "حذف" : lang === "fr" ? "Supprimer" : "Delete"}
-                                  </button>
-                                  <button
-                                    onClick={() => setDeleteMsgConfirm(null)}
-                                    className="flex-1 py-1.5 rounded-lg bg-white/5 text-green-700 text-xs hover:bg-white/10 transition-colors"
-                                  >
-                                    {lang === "ar" ? "إلغاء" : lang === "fr" ? "Annuler" : "Cancel"}
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleDeleteMsg(msg.id)}
-                                className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 text-sm hover:bg-white/5 transition-colors text-left"
-                              >
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                {t.deleteMsg}
-                              </button>
-                            )
+                            <button
+                              onClick={() => handleDeleteMsg(msg.id)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 text-sm hover:bg-white/5 transition-colors text-left"
+                            >
+                              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              {t.deleteMsg}
+                            </button>
                           )}
                         </div>
                       </div>
