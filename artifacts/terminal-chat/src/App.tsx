@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { PushNotificationProvider } from "@/contexts/PushNotificationContext";
+import { VoiceCallProvider } from "@/contexts/VoiceCallContext";
+import VoiceCallModal from "@/components/VoiceCallModal";
 import LoginPage from "@/pages/LoginPage";
 import ChatPage from "@/pages/ChatPage";
 
@@ -29,7 +31,10 @@ function AppRoutes() {
 
   return (
     <PushNotificationProvider>
-      <ChatPage />
+      <VoiceCallProvider>
+        <VoiceCallModal />
+        <ChatPage />
+      </VoiceCallProvider>
     </PushNotificationProvider>
   );
 }
