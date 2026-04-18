@@ -483,7 +483,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
               </button>
               {showMoreMenu && (
                 <div
-                  className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl z-30 min-w-[160px] overflow-hidden"
+                  className="absolute end-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl z-30 min-w-[160px] overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {isGroupAdmin && room.name !== "general" && (
