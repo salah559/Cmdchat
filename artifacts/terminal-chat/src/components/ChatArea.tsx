@@ -131,8 +131,9 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
       const target = e.target as HTMLElement;
       if (!target.closest("[data-action-sheet]")) setActionSheet(null);
     };
-    setTimeout(() => document.addEventListener("click", handler), 0);
-    return () => document.removeEventListener("click", handler);
+    // Use 600ms delay to skip the synthetic click that fires right after long-press touchend
+    const timer = setTimeout(() => document.addEventListener("click", handler), 600);
+    return () => { clearTimeout(timer); document.removeEventListener("click", handler); };
   }, [actionSheet]);
 
   useEffect(() => {
@@ -819,14 +820,25 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                           <span className="text-green-700 text-[10px]">🔖</span>
                         )}
                         {!isDeleted && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleReply(msg); }}
-                            className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                            </svg>
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleReply(msg); }}
+                              className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                              </svg>
+                            </button>
+                            <button
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); setActionSheet(actionSheet?.msgId === msg.id ? null : { msgId: msg.id, isOwn }); }}
+                              className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                              </svg>
+                            </button>
+                          </>
                         )}
                       </div>
                     )}
@@ -837,6 +849,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                         data-action-sheet
                         className={`absolute ${isOwn ? "right-0" : "left-0"} -top-[calc(100%+8px)] z-40 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[200px]`}
                         style={{ bottom: "auto" }}
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {/* Quick reactions */}
