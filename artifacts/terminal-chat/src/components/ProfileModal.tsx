@@ -67,49 +67,75 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
         onClick={(e) => e.stopPropagation()}
         dir={lang === "ar" ? "rtl" : "ltr"}
       >
-        <div className="flex justify-center pt-3 pb-0 sm:hidden">
-          <div className="w-10 h-1 bg-white/15 rounded-full" />
+        {/* Banner */}
+        <div className="h-28 overflow-hidden relative">
+          {displayPhoto ? (
+            <>
+              <img
+                src={displayPhoto}
+                alt=""
+                className="w-full h-full object-cover scale-110"
+                style={{ filter: "blur(18px) brightness(0.4) saturate(0.6)" }}
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-[#111]" />
+            </>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-b from-green-950/50 to-[#111]" />
+          )}
+          {/* Pull handle */}
+          <div className="absolute top-2.5 left-0 right-0 flex justify-center sm:hidden">
+            <div className="w-10 h-1 bg-white/25 rounded-full" />
+          </div>
         </div>
 
-        <div className="bg-gradient-to-b from-green-950/30 to-transparent px-5 pt-6 pb-4 flex flex-col items-center">
-          <div className="relative mb-3">
-            {editing ? (
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="relative block"
-              >
-                <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-green-700">
-                  {displayPhoto ? (
-                    <img src={displayPhoto} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    <div className="w-full h-full bg-green-900/50 flex items-center justify-center text-green-400 text-2xl font-bold">
-                      {name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
-                  {uploadingPhoto ? (
-                    <span className="w-5 h-5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  )}
-                </div>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-              </button>
-            ) : (
-              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-green-900/60">
-                <Avatar name={profile?.displayName} photoURL={displayPhoto} size="lg" />
+        {/* Avatar — pulled up with negative margin to overlap banner */}
+        <div className="flex justify-center -mt-12 px-5">
+          {editing ? (
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="relative block"
+            >
+              <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl" style={{ border: "3px solid #111" }}>
+                {displayPhoto ? (
+                  <img src={displayPhoto} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-full h-full bg-green-900/50 flex items-center justify-center text-green-400 text-3xl font-bold">
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
-            )}
-            {!editing && (
-              <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-[#111] ${profile?.status === "online" ? "bg-green-500" : "bg-gray-600"}`} />
-            )}
-          </div>
+              <div className="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center">
+                {uploadingPhoto ? (
+                  <span className="w-6 h-6 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-7 h-7 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+            </button>
+          ) : (
+            <div className="relative">
+              <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl" style={{ border: "3px solid #111" }}>
+                {displayPhoto ? (
+                  <img src={displayPhoto} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-full h-full bg-green-900/50 flex items-center justify-center text-green-400 text-3xl font-bold font-mono">
+                    {(profile?.displayName ?? "?").charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <span className={`absolute -bottom-1 -end-1 w-4 h-4 rounded-full border-2 border-[#111] ${profile?.status === "online" ? "bg-green-500" : "bg-gray-600"}`} />
+            </div>
+          )}
+        </div>
 
+        {/* Name + status */}
+        <div className="pt-3 pb-2 px-5 flex flex-col items-center text-center">
           {editing ? (
             <input
               type="text"
@@ -120,9 +146,8 @@ export default function ProfileModal({ uid, onClose, onSendMessage }: ProfileMod
               autoFocus
             />
           ) : (
-            <h2 className="text-green-200 font-bold text-xl text-center">{profile?.displayName}</h2>
+            <h2 className="text-green-200 font-bold text-xl">{profile?.displayName}</h2>
           )}
-
           {!editing && (
             <p className={`text-xs mt-1 ${profile?.status === "online" ? "text-green-500" : "text-green-900"}`}>
               {profile?.status === "online" ? `● ${t.online2}` : `● ${t.offline}`}
