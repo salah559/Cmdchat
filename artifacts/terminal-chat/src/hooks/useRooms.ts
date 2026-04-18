@@ -113,6 +113,10 @@ export function useRooms() {
     await updateDoc(doc(db, "rooms", roomId), { members: arrayRemove(uid) });
   };
 
+  const addMember = async (roomId: string, uid: string): Promise<void> => {
+    await updateDoc(doc(db, "rooms", roomId), { members: arrayUnion(uid) });
+  };
+
   const updateRoom = async (roomId: string, data: { name?: string; description?: string }): Promise<void> => {
     await updateDoc(doc(db, "rooms", roomId), data);
   };
@@ -146,5 +150,5 @@ export function useRooms() {
     }
   };
 
-  return { rooms, createGroup, openDM, deleteRoom, archiveRoom, unarchiveRoom, pinMessage, unpinMessage, kickMember, updateRoom, ensureGeneralRoom };
+  return { rooms, createGroup, openDM, deleteRoom, archiveRoom, unarchiveRoom, pinMessage, unpinMessage, kickMember, addMember, updateRoom, ensureGeneralRoom };
 }

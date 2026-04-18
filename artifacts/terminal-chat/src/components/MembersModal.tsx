@@ -13,7 +13,7 @@ interface MembersModalProps {
 export default function MembersModal({ room, onClose }: MembersModalProps) {
   const { user } = useAuth();
   const users = useUsers();
-  const { kickMember, updateRoom } = useRooms();
+  const { kickMember, addMember, updateRoom } = useRooms();
   const { t, lang } = useLang();
 
   const isAdmin = room.createdBy === user?.uid;
@@ -22,10 +22,18 @@ export default function MembersModal({ room, onClose }: MembersModalProps) {
   const [roomDesc, setRoomDesc] = useState(room.description ?? "");
   const [savingEdit, setSavingEdit] = useState(false);
   const [kicking, setKicking] = useState<string | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [showAddMembers, setShowAddMembers] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
 
   const members = room.members
     .map((uid) => users.find((u) => u.uid === uid))
     .filter(Boolean) as ReturnType<typeof useUsers>[number][];
+
+  const nonMembers = users.filter(
+    (u) => !room.members.includes(u.uid) &&
+      u.displayName.toLowerCase().includes(addSearch.toLowerCase())
+  );
 
   const handleSaveEdit = async () => {
     if (!roomName.trim()) return;
@@ -40,6 +48,12 @@ export default function MembersModal({ room, onClose }: MembersModalProps) {
     setKicking(uid);
     await kickMember(room.id, uid);
     setKicking(null);
+  };
+
+  const handleAdd = async (uid: string) => {
+    setAdding(uid);
+    await addMember(room.id, uid);
+    setAdding(null);
   };
 
   return (
@@ -65,14 +79,25 @@ export default function MembersModal({ room, onClose }: MembersModalProps) {
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <button
-                onClick={() => setEditing(!editing)}
-                className={`p-1.5 rounded-lg transition-colors ${editing ? "text-green-400" : "text-green-800 hover:text-green-500"}`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
+              <>
+                <button
+                  onClick={() => { setShowAddMembers(!showAddMembers); setEditing(false); setAddSearch(""); }}
+                  title={t.addMembers}
+                  className={`p-1.5 rounded-lg transition-colors ${showAddMembers ? "text-green-400 bg-green-900/20" : "text-green-800 hover:text-green-500"}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => { setEditing(!editing); setShowAddMembers(false); }}
+                  className={`p-1.5 rounded-lg transition-colors ${editing ? "text-green-400" : "text-green-800 hover:text-green-500"}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              </>
             )}
             <button onClick={onClose} className="text-green-800 hover:text-green-500 transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,6 +131,49 @@ export default function MembersModal({ room, onClose }: MembersModalProps) {
               >
                 {savingEdit ? t.saving : t.saveProfile}
               </button>
+            </div>
+          )}
+
+          {showAddMembers && isAdmin && (
+            <div className="space-y-3 pb-3 border-b border-white/5">
+              <p className="text-green-900 text-xs uppercase tracking-wider">{t.addMembers}</p>
+              <div className="flex items-center gap-2 bg-white/5 border border-white/8 rounded-xl px-3 py-2">
+                <svg className="w-3.5 h-3.5 text-green-900 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="search"
+                  value={addSearch}
+                  onChange={(e) => setAddSearch(e.target.value)}
+                  placeholder={t.searchPlaceholder}
+                  className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-sm"
+                />
+              </div>
+              {nonMembers.length === 0 ? (
+                <p className="text-green-900 text-xs text-center py-2">{t.noUsersFound ?? "No users found"}</p>
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {nonMembers.map((u) => (
+                    <div key={u.uid} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/3 transition-colors">
+                      <div className="relative shrink-0">
+                        <Avatar name={u.displayName} photoURL={u.photoURL} size="sm" />
+                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#111] ${u.status === "online" ? "bg-green-500" : "bg-gray-700"}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-green-300 text-sm font-medium truncate block">{u.displayName}</span>
+                        {u.statusText && <p className="text-green-800 text-xs truncate">{u.statusText}</p>}
+                      </div>
+                      <button
+                        onClick={() => handleAdd(u.uid)}
+                        disabled={adding === u.uid}
+                        className="text-green-700 hover:text-green-400 text-xs px-2.5 py-1 rounded-lg border border-green-900/40 hover:border-green-700/60 transition-all shrink-0 disabled:opacity-40"
+                      >
+                        {adding === u.uid ? "..." : "+"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

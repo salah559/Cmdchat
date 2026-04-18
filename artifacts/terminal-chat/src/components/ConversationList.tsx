@@ -33,6 +33,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
   const [showSettings, setShowSettings] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
 
   const activeRooms = rooms.filter((r) => !r.archived);
   const archivedRooms = rooms.filter((r) => r.archived);
@@ -129,7 +130,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
 
   return (
     <>
-      <div className="h-full flex flex-col bg-[#0a0a0a]" dir={lang === "ar" ? "rtl" : "ltr"}>
+      <div className="h-full flex flex-col bg-[#0a0a0a]" dir={lang === "ar" ? "rtl" : "ltr"} onClick={() => setShowHeaderMenu(false)}>
 
         {/* Header */}
         <div
@@ -156,47 +157,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
             </button>
 
             <div className="flex items-center gap-1 shrink-0">
-              {/* Global search */}
-              <button
-                onClick={() => setShowGlobalSearch(true)}
-                title={t.globalSearch}
-                className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-
-              {/* Settings */}
-              <button
-                onClick={() => setShowSettings(true)}
-                title={t.settings}
-                className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-
-              {/* Theme toggle */}
-              <button
-                onClick={toggleTheme}
-                title={isDark ? t.lightMode : t.darkMode}
-                className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
-              >
-                {isDark ? (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                  </svg>
-                )}
-              </button>
-
-              {/* New channel */}
+              {/* New channel - visible only on channels tab */}
               {tab === "channels" && (
                 <button
                   onClick={() => setShowCreateGroup(true)}
@@ -209,16 +170,68 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                 </button>
               )}
 
-              {/* Logout */}
-              <button
-                onClick={logout}
-                title={t.signOut}
-                className="w-8 h-8 flex items-center justify-center text-red-900 hover:text-red-500 border border-red-900/30 hover:border-red-800/50 rounded-xl transition-all active:scale-95"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
+              {/* More menu */}
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowHeaderMenu(!showHeaderMenu); }}
+                  className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
+                </button>
+
+                {showHeaderMenu && (
+                  <div
+                    className="absolute end-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl z-30 min-w-[170px] overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => { setShowGlobalSearch(true); setShowHeaderMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors text-start"
+                    >
+                      <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      {t.globalSearch}
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(true); setShowHeaderMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors text-start"
+                    >
+                      <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {t.settings}
+                    </button>
+                    <button
+                      onClick={() => { toggleTheme(); setShowHeaderMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-green-300 text-sm hover:bg-white/5 transition-colors text-start"
+                    >
+                      {isDark ? (
+                        <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                      )}
+                      {isDark ? t.lightMode : t.darkMode}
+                    </button>
+                    <div className="border-t border-white/5 mx-3" />
+                    <button
+                      onClick={() => { logout(); setShowHeaderMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-red-500 text-sm hover:bg-white/5 transition-colors text-start"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      {t.signOut}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

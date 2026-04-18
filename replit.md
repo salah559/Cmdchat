@@ -70,7 +70,7 @@ pnpm workspace monorepo using TypeScript. Includes a terminal-style chat app wit
 - Archive channels (hidden in collapsible section, can unarchive)
 - Delete channel (group creator only)
 - Members list modal with admin actions
-- Channel admin can: kick members, edit channel name/description
+- Channel admin can: kick members, add members, edit channel name/description
 - Per-room message search with highlight
 - Global search across all rooms (by name, description, last message)
 
