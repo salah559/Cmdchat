@@ -99,19 +99,53 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
   /* ── helpers ── */
   const buildPC = (onTrack: (s: MediaStream) => void) => {
     const pc = new RTCPeerConnection(ICE_SERVERS);
-    const rs = new MediaStream();
-    pc.ontrack = (e) => { e.streams[0]?.getTracks().forEach(t => rs.addTrack(t)); onTrack(rs); };
+    const remoteStream = new MediaStream();
+    
+    pc.ontrack = (e) => {
+      e.streams[0]?.getTracks().forEach(t => {
+        remoteStream.addTrack(t);
+      });
+      onTrack(remoteStream);
+    };
+
+    // Keep track of candidates received before remote description
+    const candidateQueue: RTCIceCandidateInit[] = [];
+    pc.onicecandidateerror = (e) => console.error("ICE Error:", e);
+    
     pcRef.current = pc;
-    return pc;
+    return { pc, candidateQueue };
   };
+
+  const processQueue = async (pc: RTCPeerConnection, queue: RTCIceCandidateInit[]) => {
+    while (queue.length > 0) {
+      const candidate = queue.shift();
+      if (candidate) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn("Failed to add queued candidate:", e);
+        }
+      }
+    }
+  };
+
   const getAudioEl = () => {
-    if (!remoteAudioRef.current) { remoteAudioRef.current = new Audio(); remoteAudioRef.current.autoplay = true; }
+    if (!remoteAudioRef.current) {
+      remoteAudioRef.current = new Audio();
+      remoteAudioRef.current.autoplay = true;
+      // In some browsers, we need to manually trigger play
+      remoteAudioRef.current.oncanplay = () => {
+        remoteAudioRef.current?.play().catch(e => console.warn("Autoplay blocked:", e));
+      };
+    }
     return remoteAudioRef.current;
   };
+
   const micError = (e: unknown) => {
+    console.error("Voice error detail:", e);
     const msg = (e instanceof DOMException && e.name === "NotAllowedError")
       ? "تعذّر الوصول إلى الميكروفون — تأكد من منح الإذن في المتصفح"
-      : "فشل الاتصال بالصوت";
+      : "فشل الاتصال بالصوت - تأكد من اتصال الإنترنت";
     return msg;
   };
 
@@ -119,52 +153,62 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
   const startCall = useCallback(async (calleeId: string, roomId: string) => {
     if (!user || callStateRef.current.status !== "idle") return;
 
-    // 1. Show UI immediately
     setCallState({ callId: null, status: "calling", remoteUserId: calleeId, roomId, isCaller: true, errorMsg: null });
 
     try {
-      // 2. Request mic
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
-      // 3. Build peer connection
       const audio = getAudioEl();
-      const pc = buildPC((rs) => { audio.srcObject = rs; });
+      const { pc, candidateQueue } = buildPC((rs) => { audio.srcObject = rs; });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
-      // 4. Create Firestore call doc
       const callRef = await addDoc(collection(db, "calls"), {
         callerId: user.uid, calleeId, roomId, status: "calling", createdAt: serverTimestamp(),
       });
       const callId = callRef.id;
 
-      // 5. ICE handler
       pc.onicecandidate = async (e) => {
-        if (e.candidate) await addDoc(collection(db, "calls", callId, "callerCandidates"), e.candidate.toJSON());
+        if (e.candidate) {
+          await addDoc(collection(db, "calls", callId, "callerCandidates"), e.candidate.toJSON());
+        }
       };
 
-      // 6. Create + send offer
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await updateDoc(callRef, { offer: { type: offer.type, sdp: offer.sdp } });
 
       setCallState(prev => ({ ...prev, callId }));
 
-      // 7. Watch for answer
       const callUnsub = onSnapshot(doc(db, "calls", callId), async (snap) => {
         const data = snap.data();
         if (!data) return;
+        
         if (data.answer && !pc.remoteDescription) {
           await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          await processQueue(pc, candidateQueue);
         }
-        if (data.status === "active") { setCallState(prev => ({ ...prev, status: "active" })); startTimer(); }
-        if (data.status === "ended" || data.status === "rejected") await cleanup(callId, false);
+        
+        if (data.status === "active" && callStateRef.current.status !== "active") {
+          setCallState(prev => ({ ...prev, status: "active" }));
+          startTimer();
+        }
+        
+        if (data.status === "ended" || data.status === "rejected") {
+          await cleanup(callId, false);
+        }
       });
 
-      // 8. Watch for callee ICE candidates
       const iceUnsub = onSnapshot(collection(db, "calls", callId, "calleeCandidates"), (snap) => {
         snap.docChanges().forEach(async (ch) => {
-          if (ch.type === "added") try { await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); } catch {}
+          if (ch.type === "added") {
+            const candidate = ch.doc.data() as RTCIceCandidateInit;
+            if (pc.remoteDescription) {
+              try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+            } else {
+              candidateQueue.push(candidate);
+            }
+          }
         });
       });
 
@@ -172,7 +216,6 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
 
     } catch (err) {
       console.error("startCall error:", err);
-      // Keep modal open but show error
       setCallState(prev => ({ ...prev, status: "error", errorMsg: micError(err) }));
     }
   }, [user, cleanup]);
@@ -181,34 +224,50 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
   const acceptCall = useCallback(async () => {
     if (!user || !callStateRef.current.callId) return;
     const callId = callStateRef.current.callId;
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
       const audio = getAudioEl();
-      const pc = buildPC((rs) => { audio.srcObject = rs; });
+      const { pc, candidateQueue } = buildPC((rs) => { audio.srcObject = rs; });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
       pc.onicecandidate = async (e) => {
-        if (e.candidate) await addDoc(collection(db, "calls", callId, "calleeCandidates"), e.candidate.toJSON());
+        if (e.candidate) {
+          await addDoc(collection(db, "calls", callId, "calleeCandidates"), e.candidate.toJSON());
+        }
       };
 
       const snap = await getDoc(doc(db, "calls", callId));
       const data = snap.data()!;
+      
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      await processQueue(pc, candidateQueue);
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      await updateDoc(doc(db, "calls", callId), { answer: { type: answer.type, sdp: answer.sdp }, status: "active" });
+      await updateDoc(doc(db, "calls", callId), { 
+        answer: { type: answer.type, sdp: answer.sdp }, 
+        status: "active" 
+      });
 
       setCallState(prev => ({ ...prev, status: "active" }));
       startTimer();
 
       const iceUnsub = onSnapshot(collection(db, "calls", callId, "callerCandidates"), (snap) => {
         snap.docChanges().forEach(async (ch) => {
-          if (ch.type === "added") try { await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); } catch {}
+          if (ch.type === "added") {
+            const candidate = ch.doc.data() as RTCIceCandidateInit;
+            if (pc.remoteDescription) {
+              try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+            } else {
+              candidateQueue.push(candidate);
+            }
+          }
         });
       });
+      
       const callUnsub = onSnapshot(doc(db, "calls", callId), async (snap) => {
         const d = snap.data();
         if (d?.status === "ended") await cleanup(callId, false);
@@ -234,7 +293,10 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
   /* ── toggleMute ── */
   const toggleMute = useCallback(() => {
     const track = localStreamRef.current?.getAudioTracks()[0];
-    if (track) { track.enabled = !track.enabled; setIsMuted(!track.enabled); }
+    if (track) { 
+      track.enabled = !track.enabled; 
+      setIsMuted(!track.enabled); 
+    }
   }, []);
 
   return (
