@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
-    { urls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"] },
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302", "stun:stun3.l.google.com:19302", "stun:stun4.l.google.com:19302"] },
   ],
 };
 
@@ -80,19 +80,26 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
   /* ── listen for incoming calls ── */
   useEffect(() => {
     if (!user) return;
+    // We avoid composite index by only querying calleeId and filtering status in memory
     const q = query(
       collection(db, "calls"),
-      where("calleeId", "==", user.uid),
-      where("status", "==", "calling"),
+      where("calleeId", "==", user.uid)
     );
     return onSnapshot(q, (snap) => {
       if (snap.empty) return;
-      const d = snap.docs[0];
-      const data = d.data();
-      setCallState(prev => prev.status !== "idle" ? prev : {
-        callId: d.id, status: "incoming", remoteUserId: data.callerId,
-        roomId: data.roomId, isCaller: false, errorMsg: null,
-      });
+      // Get the most recent calling doc
+      const docs = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(d => d.status === "calling")
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+      if (docs.length > 0) {
+        const d = docs[0];
+        setCallState(prev => prev.status !== "idle" ? prev : {
+          callId: d.id, status: "incoming", remoteUserId: d.callerId,
+          roomId: d.roomId, isCaller: false, errorMsg: null,
+        });
+      }
     });
   }, [user]);
 
@@ -108,7 +115,6 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
       onTrack(remoteStream);
     };
 
-    // Keep track of candidates received before remote description
     const candidateQueue: RTCIceCandidateInit[] = [];
     pc.onicecandidateerror = (e) => console.error("ICE Error:", e);
     
@@ -133,7 +139,6 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
     if (!remoteAudioRef.current) {
       remoteAudioRef.current = new Audio();
       remoteAudioRef.current.autoplay = true;
-      // In some browsers, we need to manually trigger play
       remoteAudioRef.current.oncanplay = () => {
         remoteAudioRef.current?.play().catch(e => console.warn("Autoplay blocked:", e));
       };
@@ -141,20 +146,21 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
     return remoteAudioRef.current;
   };
 
-  const micError = (e: unknown) => {
+  const micError = (e: any) => {
     console.error("Voice error detail:", e);
     
-    // 1. Check for Secure Context (Required for WebRTC)
+    if (e?.code === "permission-denied") {
+      return "خطأ: قاعدة البيانات ترفض الطلب. يرجى التحقق من Firestore Rules.";
+    }
+
     if (!window.isSecureContext) {
       return "خطأ في الأمان: الاتصال الصوتي يتطلب رابط آمن (HTTPS) ليعمل.";
     }
 
-    // 2. Check for API support
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return "متصفحك لا يدعم ميزات الاتصال الصوتي. يرجى استخدام متصفح حديث.";
     }
 
-    // 3. Handle common WebRTC errors
     if (e instanceof DOMException) {
       if (e.name === "NotAllowedError") {
         return "تعذّر الوصول إلى الميكروفون — يرجى منح الإذن في إعدادات المتصفح.";
