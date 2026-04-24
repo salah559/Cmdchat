@@ -143,15 +143,39 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
 
   const micError = (e: unknown) => {
     console.error("Voice error detail:", e);
-    const msg = (e instanceof DOMException && e.name === "NotAllowedError")
-      ? "تعذّر الوصول إلى الميكروفون — تأكد من منح الإذن في المتصفح"
-      : "فشل الاتصال بالصوت - تأكد من اتصال الإنترنت";
-    return msg;
+    
+    // 1. Check for Secure Context (Required for WebRTC)
+    if (!window.isSecureContext) {
+      return "خطأ في الأمان: الاتصال الصوتي يتطلب رابط آمن (HTTPS) ليعمل.";
+    }
+
+    // 2. Check for API support
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return "متصفحك لا يدعم ميزات الاتصال الصوتي. يرجى استخدام متصفح حديث.";
+    }
+
+    // 3. Handle common WebRTC errors
+    if (e instanceof DOMException) {
+      if (e.name === "NotAllowedError") {
+        return "تعذّر الوصول إلى الميكروفون — يرجى منح الإذن في إعدادات المتصفح.";
+      }
+      if (e.name === "NotFoundError" || e.name === "DevicesNotFoundError") {
+        return "لم يتم العثور على ميكروفون — يرجى التأكد من توصيله بجهازك.";
+      }
+    }
+
+    return "فشل الاتصال بالصوت - تأكد من اتصال الإنترنت وحاول مرة أخرى.";
   };
 
   /* ── startCall ── */
   const startCall = useCallback(async (calleeId: string, roomId: string) => {
     if (!user || callStateRef.current.status !== "idle") return;
+
+    // Check for Secure Context & Support immediately
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setCallState({ ...IDLE, status: "error", remoteUserId: calleeId, errorMsg: micError(new Error("Insecure or unsupported")) });
+      return;
+    }
 
     setCallState({ callId: null, status: "calling", remoteUserId: calleeId, roomId, isCaller: true, errorMsg: null });
 
@@ -225,6 +249,11 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
     if (!user || !callStateRef.current.callId) return;
     const callId = callStateRef.current.callId;
     
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setCallState(prev => ({ ...prev, status: "error", errorMsg: micError(new Error("Insecure or unsupported")) }));
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
