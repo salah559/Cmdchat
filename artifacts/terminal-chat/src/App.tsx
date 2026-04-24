@@ -55,7 +55,9 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
+              <div className="min-h-screen bg-app text-app selection:bg-blue-500/30 selection:text-white font-sans">
+                <Router />
+              </div>
             </WouterRouter>
           </AuthProvider>
         </QueryClientProvider>

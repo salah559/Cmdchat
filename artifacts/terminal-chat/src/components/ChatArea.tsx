@@ -410,16 +410,16 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
 
   return (
     <>
-      <div className="h-full flex flex-col bg-[#0a0a0a] overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
+      <div className="h-full flex flex-col bg-app overflow-hidden font-sans" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Header */}
         <div
-          className="bg-[#0f0f0f] border-b border-white/5 flex items-center gap-3 px-3 pb-3 shrink-0"
+          className="bg-app-surface border-b border-white/5 flex items-center gap-3 px-4 pb-3 shrink-0"
           style={{ paddingTop: `calc(${safeTop} + 8px)` }}
         >
           {showBack && (
             <button
               onClick={onBack}
-              className="flex p-2 -ml-1 text-green-600 hover:text-green-400 active:scale-95 transition-all shrink-0 items-center justify-center"
+              className="flex p-2 -ml-1 text-app-text-dim hover:text-white active:scale-95 transition-all shrink-0 items-center justify-center"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -434,11 +434,11 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             {room?.type === "dm" && otherUser ? (
               <>
                 <Avatar name={otherUser.displayName} photoURL={otherUser.photoURL} size="sm" />
-                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0f0f0f] ${otherUser.status === "online" ? "bg-green-500" : "bg-gray-700"}`} />
+                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-app-surface ${otherUser.status === "online" ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-700"}`} />
               </>
             ) : (
-              <div className="w-8 h-8 rounded-full bg-green-900/40 border border-green-800/50 flex items-center justify-center">
-                <span className="text-green-500 font-bold text-sm font-mono">#</span>
+              <div className="w-9 h-9 rounded-xl bg-app-surface3 border border-white/5 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">#</span>
               </div>
             )}
           </button>
@@ -447,15 +447,17 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             onClick={() => room?.type === "dm" && otherUser ? setProfileUid(otherUser.uid) : undefined}
             className={`flex-1 min-w-0 text-left ${room?.type === "dm" ? "active:opacity-70" : ""}`}
           >
-            <div className="text-green-300 font-semibold text-sm truncate">
-              {room?.type === "group" ? `# ${roomTitle}` : roomTitle}
+            <div className="text-white font-bold text-[15px] truncate leading-tight">
+              {room?.type === "group" ? roomTitle : roomTitle}
             </div>
             {otherUser ? (
-              <div className={`text-xs ${otherUser.status === "online" ? "text-green-600" : "text-green-900"}`}>
-                {otherUser.statusText ? otherUser.statusText : otherUser.status === "online" ? t.online2 : t.offline}
+              <div className={`text-[11px] font-medium ${otherUser.status === "online" ? "text-green-500" : "text-app-text-dim"}`}>
+                {otherUser.status === "online" ? t.online2 : t.offline}
               </div>
             ) : room?.type === "group" ? (
-              <div className="text-green-900 text-xs">{room.members.length} {t.members}</div>
+              <div className="text-app-text-dim text-[11px] font-medium">
+                {room.members.length} {t.members}
+              </div>
             ) : null}
           </button>
 
@@ -648,9 +650,9 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
 
             if (msg.type === "system") {
               return (
-                <div key={msg.id} className="flex items-center gap-3 my-3">
+                <div key={msg.id} className="flex items-center gap-3 my-4">
                   <div className="flex-1 h-px bg-white/5" />
-                  <span className="text-green-900 text-xs px-2">{msg.text}</span>
+                  <span className="text-app-text-dim text-[11px] font-medium uppercase tracking-widest px-2">{msg.text}</span>
                   <div className="flex-1 h-px bg-white/5" />
                 </div>
               );
@@ -659,9 +661,9 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             return (
               <div key={msg.id} ref={(el) => { if (el) msgRefs.current.set(msg.id, el); else msgRefs.current.delete(msg.id); }}>
                 {showDate && (
-                  <div className="flex items-center gap-3 my-4">
+                  <div className="flex items-center gap-3 my-6">
                     <div className="flex-1 h-px bg-white/5" />
-                    <span className="text-green-900 text-xs">{dateLabel}</span>
+                    <span className="text-app-text-dim text-[11px] font-bold uppercase tracking-widest">{dateLabel}</span>
                     <div className="flex-1 h-px bg-white/5" />
                   </div>
                 )}
@@ -680,7 +682,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                   {/* Swipe-to-reply icon */}
                   <div
                     data-swipe-icon
-                    className={`absolute ${isOwn ? "left-1" : "right-1"} top-1/2 -translate-y-1/2 text-green-500 pointer-events-none z-10`}
+                    className={`absolute ${isOwn ? "left-1" : "right-1"} top-1/2 -translate-y-1/2 text-app-primary pointer-events-none z-10`}
                     style={{ opacity: 0, transform: "scale(0.5)" }}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -708,9 +710,9 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
 
                     {/* Reply preview */}
                     {msg.replyTo && !isDeleted && (
-                      <div className={`mb-1 px-2.5 py-1.5 rounded-xl border-l-2 border-green-600 bg-green-900/20 max-w-full`}>
-                        <div className="text-green-600 text-[10px] font-semibold truncate">{msg.replyTo.displayName}</div>
-                        <div className="text-green-800 text-xs truncate">
+                      <div className={`mb-1 px-3 py-2 rounded-xl border-l-2 border-app-primary bg-white/5 max-w-full backdrop-blur-sm`}>
+                        <div className="text-app-primary text-[10px] font-bold uppercase tracking-tight truncate">{msg.replyTo.displayName}</div>
+                        <div className="text-app-text-dim text-xs truncate">
                           {msg.replyTo.imageUrl ? "📷 Photo" : msg.replyTo.text}
                         </div>
                       </div>
@@ -770,14 +772,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                         ) : (
                           /* Text */
                           msg.text && (
-                            <div className={`px-3.5 py-2.5 text-sm leading-relaxed break-words rounded-2xl ${
+                            <div className={`px-4 py-2.5 text-[14px] leading-relaxed break-words rounded-2xl shadow-sm ${
                               isOwn
-                                ? "bg-green-800/50 text-green-100 rounded-br-sm"
-                                : "bg-[#1c1c1c] text-green-200 border border-white/5 rounded-bl-sm"
+                                ? "bg-app-bubble-own-bg text-white rounded-br-sm"
+                                : "bg-app-surface3 text-app-bubble-other-text border border-white/5 rounded-bl-sm"
                             }`}>
                               {renderText(msg.text, msg.id)}
                               {msg.edited && (
-                                <span className="text-green-900 text-[10px] ml-1.5">({t.edited})</span>
+                                <span className="text-[10px] opacity-50 ml-1.5">({t.edited})</span>
                               )}
                             </div>
                           )
@@ -817,7 +819,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                       <div className={`flex items-center gap-1.5 mt-0.5 mx-1 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleReply(msg); }}
-                          className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
+                          className="text-app-text-dim hover:text-white transition-colors active:scale-95"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -826,7 +828,7 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                         <button
                           onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => { e.stopPropagation(); setActionSheet(actionSheet?.msgId === msg.id ? null : { msgId: msg.id, isOwn }); }}
-                          className="text-green-900 hover:text-green-600 transition-colors active:scale-95"
+                          className="text-app-text-dim hover:text-white transition-colors active:scale-95"
                         >
                           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
@@ -838,14 +840,14 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
                     {/* Time + status — only at group end */}
                     {isGroupEnd && !isEditing && (
                       <div className={`flex items-center gap-2 mt-0.5 mx-1 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-                        <span className="text-green-900 text-[10px]">{formatTime(msg.createdAt)}</span>
+                        <span className="text-app-text-dim text-[10px] font-medium">{formatTime(msg.createdAt)}</span>
                         {isOwn && room?.type === "dm" && isLastOwnInChat && (
-                          <span className={`text-[10px] font-bold ${isLastOwnRead ? "text-green-500" : "text-green-900"}`}>
+                          <span className={`text-[10px] font-bold ${isLastOwnRead ? "text-app-primary" : "text-app-text-dim"}`}>
                             {isLastOwnRead ? "✓✓" : "✓"}
                           </span>
                         )}
                         {isBookmarked && (
-                          <span className="text-green-700 text-[10px]">🔖</span>
+                          <span className="text-app-primary text-[10px]">🔖</span>
                         )}
                       </div>
                     )}
@@ -910,69 +912,74 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
           </div>
         )}
 
-        {/* Input bar */}
-        <div
-          className="bg-[#0f0f0f] border-t border-white/5 px-3 pt-2 shrink-0"
-          style={{ paddingBottom: `calc(${safeBottom} + 8px)` }}
+        {/* Input Area */}
+        <div 
+          className="bg-app-surface border-t border-white/5 p-3 shrink-0"
+          style={{ paddingBottom: `calc(${safeBottom} + 12px)` }}
         >
-          <form onSubmit={handleSend} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setProfileUid(user!.uid)}
-              className="shrink-0 active:opacity-70 transition-opacity"
-            >
-              <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploadingImage}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-green-800 hover:text-green-500 bg-white/5 transition-all active:scale-95 disabled:opacity-40 shrink-0"
-            >
-              {uploadingImage ? (
-                <span className="w-4 h-4 border-2 border-green-900 border-t-green-500 rounded-full animate-spin" />
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <form onSubmit={handleSend} className="max-w-4xl mx-auto flex flex-col gap-2">
+            {replyTo && (
+              <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-2 animate-in fade-in slide-in-from-bottom-1 backdrop-blur-md">
+                <div className="min-w-0">
+                  <div className="text-[10px] text-app-primary font-bold uppercase tracking-tight">{t.replyingTo} {replyTo.displayName}</div>
+                  <div className="text-xs text-app-text-dim truncate">{replyTo.text || "📷 Photo"}</div>
+                </div>
+                <button type="button" onClick={() => setReplyTo(null)} className="text-app-text-dim hover:text-white transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="p-2 text-app-text-dim hover:text-app-primary transition-all active:scale-90 shrink-0"
+                title="Attach file"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-              )}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
 
-            <div className="flex-1 flex items-center bg-white/5 border border-white/8 rounded-full px-4 py-2.5 min-w-0">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={handleInputChange}
-                disabled={sending}
-                placeholder={replyTo ? `${t.replyPlaceholder} ${replyTo.displayName}...` : previewImage ? t.captionPlaceholder : t.messagePlaceholder}
-                className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-[15px] min-w-0"
-                autoComplete="off"
-                autoCapitalize="sentences"
-                enterKeyHint="send"
-                inputMode="text"
-              />
+              <div className="flex-1 relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder={t.placeholder}
+                  className="w-full bg-app-surface2 border border-white/5 rounded-2xl px-5 py-3 text-[15px] text-white placeholder-app-text-dim outline-none focus:border-app-primary/30 transition-all shadow-inner"
+                  disabled={sending}
+                  autoComplete="off"
+                />
+              </div>
+              
+              <button
+                type="submit"
+                disabled={(!input.trim() && !previewImage) || sending}
+                className={`p-3 rounded-2xl transition-all ${
+                  (input.trim() || previewImage) && !sending
+                    ? "bg-app-primary text-white shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:-translate-y-0.5 active:translate-y-0"
+                    : "bg-white/5 text-app-text-dim opacity-50"
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={(!input.trim() && !previewImage) || sending || uploadingImage}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 shrink-0 ${
-                (input.trim() || previewImage) && !sending && !uploadingImage
-                  ? "bg-green-600 text-black"
-                  : "bg-white/5 text-green-900"
-              }`}
-            >
-              {sending ? (
-                <span className="w-4 h-4 border-2 border-green-900 border-t-green-400 rounded-full animate-spin" />
-              ) : (
-                <svg className="w-4 h-4 rotate-90" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                </svg>
-              )}
-            </button>
+            
+            {typingUsers.length > 0 && (
+              <div className="px-4 text-[11px] font-medium text-app-text-dim italic animate-pulse">
+                {typingUsers.length === 1 
+                  ? `${typingUsers[0].displayName} is typing...` 
+                  : `${typingUsers.length} people are typing...`}
+              </div>
+            )}
           </form>
         </div>
       </div>
@@ -980,24 +987,23 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
       {/* Action sheet — fixed overlay, outside scroll container */}
       {actionSheet && activeAction && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
           onClick={() => setActionSheet(null)}
         >
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div
             data-action-sheet
-            className="relative w-full max-w-xs mx-4 mb-5 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-sm mx-auto bg-app-surface border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 duration-300"
             onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
           >
             {/* Quick reactions */}
-            <div className="flex items-center justify-around px-2 py-2 border-b border-white/5">
+            <div className="flex items-center justify-around px-4 py-4 border-b border-white/5">
               {QUICK_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => { toggleReaction(activeAction.id, emoji); setActionSheet(null); }}
-                  className={`w-8 h-8 flex items-center justify-center text-lg active:scale-90 transition-transform rounded-full ${
-                    activeAction.reactions?.[emoji]?.includes(user?.uid ?? "") ? "bg-green-800/40" : ""
+                  className={`w-10 h-10 flex items-center justify-center text-xl active:scale-90 transition-transform rounded-xl hover:bg-white/5 ${
+                    activeAction.reactions?.[emoji]?.includes(user?.uid ?? "") ? "bg-app-primary/20 scale-110" : ""
                   }`}
                 >
                   {emoji}
@@ -1006,63 +1012,53 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
             </div>
 
             {/* Action buttons */}
-            <div>
+            <div className="p-2">
               <button
-                onClick={() => { const m = activeAction; handleReply({ id: m.id, text: m.text, displayName: m.displayName, imageUrl: m.imageUrl }); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2 text-green-300 text-xs hover:bg-white/5 transition-colors"
+                onClick={() => { const m = activeAction; handleReply({ id: m.id, text: m.text, displayName: m.displayName, imageUrl: m.imageUrl }); setActionSheet(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 rounded-xl transition-colors"
               >
-                <svg className="w-3.5 h-3.5 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                </svg>
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </div>
                 {t.replyMsg}
               </button>
 
               {actionSheet.isOwn && !activeAction.deletedAt && (
                 <button
-                  onClick={() => handleEditStart(activeAction)}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-green-300 text-xs hover:bg-white/5 transition-colors"
+                  onClick={() => { handleEditStart(activeAction); setActionSheet(null); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 rounded-xl transition-colors"
                 >
-                  <svg className="w-3.5 h-3.5 shrink-0 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </div>
                   {t.editMsg}
                 </button>
               )}
 
-              {room?.type === "group" && isGroupAdmin && !activeAction.deletedAt && (
-                <button
-                  onClick={() => handlePin(activeAction.id)}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-green-300 text-xs hover:bg-white/5 transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5 shrink-0 text-green-700" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
-                  </svg>
-                  {room.pinnedMessageId === activeAction.id ? t.unpinMsg : t.pinMsg}
-                </button>
-              )}
-
-              {!activeAction.deletedAt && (
-                <button
-                  onClick={() => handleBookmark(activeAction.id, activeAction.text)}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-green-300 text-xs hover:bg-white/5 transition-colors"
-                >
-                  <span className="text-green-700 text-sm leading-none shrink-0">🔖</span>
-                  {bookmarks.has(`${roomId}:${activeAction.id}`)
-                    ? (lang === "ar" ? "إزالة الإشارة" : lang === "fr" ? "Retirer le signet" : "Remove bookmark")
-                    : (lang === "ar" ? "وضع إشارة" : lang === "fr" ? "Ajouter un signet" : "Bookmark")}
-                </button>
-              )}
+              <button
+                onClick={() => { handleBookmark(activeAction.id, activeAction.text); setActionSheet(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 rounded-xl transition-colors"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 text-lg">🔖</div>
+                {bookmarks.has(`${roomId}:${activeAction.id}`) ? t.unpinMsg : t.pinMsg}
+              </button>
 
               {actionSheet.isOwn && !activeAction.deletedAt && (
                 <>
-                  <div className="h-px bg-white/5 mx-3" />
+                  <div className="h-px bg-white/5 mx-4 my-2" />
                   <button
-                    onClick={() => handleDeleteMsg(activeAction.id)}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-red-500 text-xs hover:bg-white/5 transition-colors"
+                    onClick={() => { handleDeleteMsg(activeAction.id); setActionSheet(null); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-red-500 text-sm font-medium hover:bg-red-500/10 rounded-xl transition-colors"
                   >
-                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                    <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </div>
                     {t.deleteMsg}
                   </button>
                 </>

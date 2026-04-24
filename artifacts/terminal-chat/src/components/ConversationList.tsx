@@ -130,29 +130,25 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
 
   return (
     <>
-      <div className="h-full flex flex-col bg-[#0a0a0a]" dir={lang === "ar" ? "rtl" : "ltr"} onClick={() => setShowHeaderMenu(false)}>
+      <div className="h-full flex flex-col bg-app border-r border-white/5 font-sans" dir={lang === "ar" ? "rtl" : "ltr"} onClick={() => setShowHeaderMenu(false)}>
 
         {/* Header */}
         <div
           className="px-4 pb-3 bg-[#0a0a0a] border-b border-white/5 shrink-0"
           style={{ paddingTop: `calc(${safeTop} + 8px)` }}
         >
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => setProfileUid(user!.uid)}
-              className="flex items-center gap-2.5 active:opacity-70 transition-opacity min-w-0"
+              className="flex items-center gap-3 active:opacity-70 transition-opacity min-w-0 group"
             >
               <div className="relative shrink-0">
                 <Avatar name={user?.displayName} photoURL={user?.photoURL} size="sm" />
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0a0a0a] bg-green-500" />
+                <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-app-surface bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
               </div>
               <div className="text-left min-w-0">
-                <p className="text-green-300 font-semibold text-sm leading-tight truncate max-w-[120px]">{user?.displayName}</p>
-                {currentUser?.statusText ? (
-                  <p className="text-green-700 text-xs truncate max-w-[120px]">{currentUser.statusText}</p>
-                ) : (
-                  <p className="text-green-600 text-xs">● {t.online2}</p>
-                )}
+                <p className="text-white font-bold text-[15px] leading-tight truncate max-w-[120px]">{user?.displayName}</p>
+                <p className="text-app-text-dim text-[11px] font-medium">{t.online2}</p>
               </div>
             </button>
 
@@ -171,15 +167,15 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
               )}
 
               {/* More menu */}
-              <div className="relative">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowHeaderMenu(!showHeaderMenu); }}
-                  className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                  </svg>
-                </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowHeaderMenu(!showHeaderMenu); }}
+                className="w-9 h-9 flex items-center justify-center text-app-text-dim hover:text-white hover:bg-white/5 rounded-xl transition-all active:scale-95"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </button>
 
                 {showHeaderMenu && (
                   <div
@@ -236,49 +232,39 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
           </div>
 
           {/* Search */}
-          <div className="flex items-center gap-2 bg-white/5 border border-white/6 rounded-xl px-3 py-2.5">
-            <svg className="w-4 h-4 text-green-900 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <div className="flex items-center gap-2 bg-app-surface2 border border-white/5 rounded-xl px-3 py-2.5 shadow-inner">
+            <svg className="w-4 h-4 text-app-text-dim shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t.searchPlaceholder}
-              className="flex-1 bg-transparent outline-none text-green-300 placeholder-green-900 text-sm"
+              className="flex-1 bg-transparent outline-none text-white placeholder-app-text-dim text-sm font-medium"
             />
-            {search && (
-              <button onClick={() => setSearch("")} className="text-green-900 hover:text-green-700 transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
           </div>
         </div>
 
         {/* Tab bar */}
-        <div className="flex border-b border-white/5 bg-[#0a0a0a] shrink-0">
-          {tabs.map((t) => (
+        <div className="flex px-2 py-2 gap-1 bg-app shrink-0">
+          {tabs.map((tabItem) => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 transition-all relative ${
-                tab === t.key ? "text-green-400" : "text-green-900 hover:text-green-700"
+              key={tabItem.key}
+              onClick={() => setTab(tabItem.key)}
+              className={`flex-1 flex items-center justify-center py-2.5 gap-2 rounded-xl transition-all relative ${
+                tab === tabItem.key ? "bg-app-primary/10 text-app-primary" : "text-app-text-dim hover:bg-white/5 hover:text-white"
               }`}
             >
               <div className="relative">
-                {t.icon}
-                {t.badge !== undefined && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 rounded-full bg-green-600 text-black text-[10px] font-bold flex items-center justify-center px-0.5">
-                    {t.badge}
+                {tabItem.icon}
+                {tabItem.badge !== undefined && (
+                  <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] rounded-full bg-app-primary text-white text-[10px] font-bold flex items-center justify-center px-1 border-2 border-app shadow-lg">
+                    {tabItem.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
-              {tab === t.key && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-green-500 rounded-full" />
-              )}
+              <span className="text-[11px] font-bold uppercase tracking-tight">{tabItem.label}</span>
             </button>
           ))}
         </div>
@@ -311,24 +297,24 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                       <button
                         key={room.id}
                         onClick={() => handleSelectRoom(room.id)}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/3 transition-colors active:bg-green-950/20 ${
-                          activeRoomId === room.id ? "bg-green-950/15 border-l-2 border-l-green-600" : ""
+                        className={`w-full flex items-center gap-3 px-4 py-4 transition-all active:scale-[0.98] ${
+                          activeRoomId === room.id ? "bg-app-primary/10" : "hover:bg-white/5"
                         }`}
                       >
-                        <div className="w-11 h-11 rounded-2xl bg-green-900/25 border border-green-800/30 flex items-center justify-center shrink-0 relative">
-                          <span className="text-green-600 font-bold text-lg font-mono">#</span>
+                        <div className="w-12 h-12 rounded-2xl bg-app-surface2 border border-white/5 flex items-center justify-center shrink-0 relative">
+                          <span className="text-app-primary font-bold text-xl">#</span>
                           {unread && (
-                            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-500 border-2 border-[#0a0a0a]" />
+                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-app-primary border-2 border-app shadow-lg" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center justify-between gap-2">
-                            <span className={`font-semibold text-sm truncate ${unread ? "text-green-200" : "text-green-300"}`}>{room.name}</span>
-                            <span className="text-green-900 text-xs shrink-0">{formatTime(room.lastMessageAt)}</span>
+                            <span className={`font-bold text-[15px] truncate ${unread ? "text-white" : "text-app-text-dim"}`}>{room.name}</span>
+                            <span className="text-app-text-dim text-[11px] font-medium">{formatTime(room.lastMessageAt)}</span>
                           </div>
-                          <div className={`text-xs truncate mt-0.5 ${unread ? "text-green-600 font-medium" : "text-green-800"}`}>
+                          <div className={`text-xs truncate mt-1 ${unread ? "text-white font-semibold" : "text-app-text-dim"}`}>
                             {room.description ? (
-                              <span className="text-green-900 text-[10px]">{room.description}</span>
+                              <span className="opacity-70">{room.description}</span>
                             ) : (
                               room.lastMessage || t.noMessages2
                             )}
