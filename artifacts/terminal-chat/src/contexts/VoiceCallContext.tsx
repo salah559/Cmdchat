@@ -171,7 +171,6 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
   const startCall = useCallback(async (calleeId: string, roomId: string) => {
     if (!user || callStateRef.current.status !== "idle") return;
 
-    // Check for Secure Context & Support immediately
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       setCallState({ ...IDLE, status: "error", remoteUserId: calleeId, errorMsg: micError(new Error("Insecure or unsupported")) });
       return;
@@ -187,14 +186,23 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
       const { pc, candidateQueue } = buildPC((rs) => { audio.srcObject = rs; });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
+      // 1. Create call doc with empty candidate arrays
       const callRef = await addDoc(collection(db, "calls"), {
-        callerId: user.uid, calleeId, roomId, status: "calling", createdAt: serverTimestamp(),
+        callerId: user.uid,
+        calleeId,
+        roomId,
+        status: "calling",
+        callerCandidates: [],
+        calleeCandidates: [],
+        createdAt: serverTimestamp(),
       });
       const callId = callRef.id;
 
       pc.onicecandidate = async (e) => {
         if (e.candidate) {
-          await addDoc(collection(db, "calls", callId, "callerCandidates"), e.candidate.toJSON());
+          const snap = await getDoc(callRef);
+          const current = snap.data()?.callerCandidates || [];
+          await updateDoc(callRef, { callerCandidates: [...current, e.candidate.toJSON()] });
         }
       };
 
@@ -208,9 +216,23 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
         const data = snap.data();
         if (!data) return;
         
+        // Handle Answer
         if (data.answer && !pc.remoteDescription) {
           await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
           await processQueue(pc, candidateQueue);
+        }
+        
+        // Handle callee ICE candidates from array
+        if (data.calleeCandidates && data.calleeCandidates.length > 0) {
+          for (const cand of data.calleeCandidates) {
+            if (pc.remoteDescription) {
+              try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
+            } else {
+              if (!candidateQueue.find(q => q.candidate === cand.candidate)) {
+                candidateQueue.push(cand);
+              }
+            }
+          }
         }
         
         if (data.status === "active" && callStateRef.current.status !== "active") {
@@ -223,24 +245,13 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      const iceUnsub = onSnapshot(collection(db, "calls", callId, "calleeCandidates"), (snap) => {
-        snap.docChanges().forEach(async (ch) => {
-          if (ch.type === "added") {
-            const candidate = ch.doc.data() as RTCIceCandidateInit;
-            if (pc.remoteDescription) {
-              try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
-            } else {
-              candidateQueue.push(candidate);
-            }
-          }
-        });
-      });
+      unsubRef.current = [callUnsub];
 
-      unsubRef.current = [callUnsub, iceUnsub];
-
-    } catch (err) {
+    } catch (err: any) {
       console.error("startCall error:", err);
-      setCallState(prev => ({ ...prev, status: "error", errorMsg: micError(err) }));
+      let msg = micError(err);
+      if (err.code === "permission-denied") msg = "خطأ: تأكد من ضبط قواعد حماية Firebase (Firestore Rules) للسماح بالكتابة في مجموعة calls";
+      setCallState(prev => ({ ...prev, status: "error", errorMsg: msg }));
     }
   }, [user, cleanup]);
 
@@ -262,21 +273,31 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
       const { pc, candidateQueue } = buildPC((rs) => { audio.srcObject = rs; });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
+      const callRef = doc(db, "calls", callId);
       pc.onicecandidate = async (e) => {
         if (e.candidate) {
-          await addDoc(collection(db, "calls", callId, "calleeCandidates"), e.candidate.toJSON());
+          const snap = await getDoc(callRef);
+          const current = snap.data()?.calleeCandidates || [];
+          await updateDoc(callRef, { calleeCandidates: [...current, e.candidate.toJSON()] });
         }
       };
 
-      const snap = await getDoc(doc(db, "calls", callId));
+      const snap = await getDoc(callRef);
       const data = snap.data()!;
       
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
       await processQueue(pc, candidateQueue);
 
+      // Add caller candidates that were already in the doc
+      if (data.callerCandidates) {
+        for (const cand of data.callerCandidates) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
+        }
+      }
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      await updateDoc(doc(db, "calls", callId), { 
+      await updateDoc(callRef, { 
         answer: { type: answer.type, sdp: answer.sdp }, 
         status: "active" 
       });
@@ -284,28 +305,26 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
       setCallState(prev => ({ ...prev, status: "active" }));
       startTimer();
 
-      const iceUnsub = onSnapshot(collection(db, "calls", callId, "callerCandidates"), (snap) => {
-        snap.docChanges().forEach(async (ch) => {
-          if (ch.type === "added") {
-            const candidate = ch.doc.data() as RTCIceCandidateInit;
-            if (pc.remoteDescription) {
-              try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
-            } else {
-              candidateQueue.push(candidate);
-            }
-          }
-        });
-      });
-      
-      const callUnsub = onSnapshot(doc(db, "calls", callId), async (snap) => {
+      const callUnsub = onSnapshot(callRef, async (snap) => {
         const d = snap.data();
-        if (d?.status === "ended") await cleanup(callId, false);
+        if (!d) return;
+
+        // Watch for late caller candidates
+        if (d.callerCandidates) {
+          for (const cand of d.callerCandidates) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
+          }
+        }
+
+        if (d.status === "ended") await cleanup(callId, false);
       });
 
-      unsubRef.current = [iceUnsub, callUnsub];
-    } catch (err) {
+      unsubRef.current = [callUnsub];
+    } catch (err: any) {
       console.error("acceptCall error:", err);
-      setCallState(prev => ({ ...prev, status: "error", errorMsg: micError(err) }));
+      let msg = micError(err);
+      if (err.code === "permission-denied") msg = "خطأ في الصلاحيات: تحقق من إعدادات Firestore";
+      setCallState(prev => ({ ...prev, status: "error", errorMsg: msg }));
     }
   }, [user, cleanup]);
 
