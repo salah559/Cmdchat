@@ -134,7 +134,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
 
         {/* Header */}
         <div
-          className="px-4 pb-3 bg-[#0a0a0a] border-b border-white/5 shrink-0"
+          className="px-4 pb-3 bg-app-surface border-b border-white/5 shrink-0"
           style={{ paddingTop: `calc(${safeTop} + 8px)` }}
         >
           <div className="flex items-center justify-between mb-4">
@@ -158,7 +158,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                 <button
                   onClick={() => setShowCreateGroup(true)}
                   title={t.newChannelTitle}
-                  className="w-8 h-8 flex items-center justify-center text-green-700 hover:text-green-400 border border-green-900/50 hover:border-green-700/60 rounded-xl transition-all active:scale-95"
+                  className="w-8 h-8 flex items-center justify-center text-app-text-dim hover:text-white border border-white/10 hover:border-white/20 rounded-xl transition-all active:scale-95"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -166,8 +166,6 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                 </button>
               )}
 
-              {/* More menu */}
-            <div className="flex items-center gap-2 shrink-0">
               {/* More menu */}
               <div className="relative">
                 <button
@@ -186,7 +184,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                   >
                     <button
                       onClick={() => { setShowGlobalSearch(true); setShowHeaderMenu(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 transition-colors text-start"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 rounded-xl transition-colors text-start"
                     >
                       <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -197,7 +195,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                     </button>
                     <button
                       onClick={() => { setShowSettings(true); setShowHeaderMenu(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 transition-colors text-start"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 rounded-xl transition-colors text-start"
                     >
                       <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,7 +206,7 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                     </button>
                     <button
                       onClick={() => { toggleTheme(); setShowHeaderMenu(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 transition-colors text-start"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm font-medium hover:bg-white/5 rounded-xl transition-colors text-start"
                     >
                       <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
                         {isDark ? (
@@ -223,10 +221,10 @@ export default function ConversationList({ activeRoomId, onSelectRoom }: Convers
                       </div>
                       {isDark ? t.lightMode : t.darkMode}
                     </button>
-                    <div className="border-t border-white/5 mx-4 my-1" />
+                    <div className="border-t border-white/5 mx-4 my-1"></div>
                     <button
                       onClick={() => { logout(); setShowHeaderMenu(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-red-500 text-sm font-bold hover:bg-red-500/10 transition-colors text-start"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-red-500 text-sm font-bold hover:bg-red-500/10 rounded-xl transition-colors text-start"
                     >
                       <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
