@@ -189,7 +189,9 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
       setInput(text);
       setPreviewImage(imgUrl ?? null);
       setReplyTo(reply ?? null);
-      alert(t.failedSendMessage ?? "Failed to send message. Please try again.");
+      const code = (err as { code?: string })?.code;
+      const base = t.failedSendMessage ?? "Failed to send message. Please try again.";
+      alert(code ? `${base} (${code})` : base);
     } finally {
       setSending(false);
       inputRef.current?.focus();
