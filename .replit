@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-20", "web", "bash"]
 
 [deployment]
 router = "application"
@@ -33,7 +33,7 @@ waitForPort = 3000
 outputType = "webview"
 
 [agent]
-stack = "PNPM_WORKSPACE"
+stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
 
 [postMerge]
@@ -62,3 +62,6 @@ externalPort = 3000
 VAPID_PUBLIC_KEY = "BPbbhMVQS_8hYKacfWhmpOfKUr_5WD4eiDuMzw651He-Ymb1OEWFvWfaT1IGCK80QSOFv2mFDFncemPsULUPC1w"
 VAPID_PRIVATE_KEY = "WlXGlPXFDNDMQau_aju93FvptbBJU6qRLoYVafpiIZU"
 VAPID_EMAIL = "mailto:termchat@example.com"
+
+[nix]
+channel = "stable-25_05"
