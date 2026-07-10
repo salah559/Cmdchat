@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD06ZbZiGfVQReCCWygYF3OfTL_6DZI1Hk",
@@ -14,5 +14,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Some mobile carriers/proxies block Firestore's default gRPC-streaming
+// connection, causing writes (like sending a message) to hang or fail
+// silently. Auto-detecting long-polling avoids that on restrictive networks.
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
 export const googleProvider = new GoogleAuthProvider();
