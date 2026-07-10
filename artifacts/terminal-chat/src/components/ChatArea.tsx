@@ -170,22 +170,31 @@ export default function ChatArea({ roomId, onBack, onRoomDeleted, showBack = fal
     setReplyTo(null);
     setSending(true);
     await clearTyping();
-    if (isSoundEnabled()) playSentSound();
-    await sendMessage(text, imgUrl ?? undefined, reply ?? undefined);
 
-    if (room && room.members.length > 1) {
-      const senderName = user?.displayName ?? "Someone";
-      const bodyText = imgUrl ? "📷 Photo" : (text.trim().slice(0, 80) || "Message");
-      notifyMembers(room.members, {
-        title: room.type === "dm" ? senderName : `${senderName} in ${roomTitle}`,
-        body: bodyText,
-        tag: `room-${roomId}`,
-      });
+    try {
+      await sendMessage(text, imgUrl ?? undefined, reply ?? undefined);
+      if (isSoundEnabled()) playSentSound();
+
+      if (room && room.members.length > 1) {
+        const senderName = user?.displayName ?? "Someone";
+        const bodyText = imgUrl ? "📷 Photo" : (text.trim().slice(0, 80) || "Message");
+        notifyMembers(room.members, {
+          title: room.type === "dm" ? senderName : `${senderName} in ${roomTitle}`,
+          body: bodyText,
+          tag: `room-${roomId}`,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      setInput(text);
+      setPreviewImage(imgUrl ?? null);
+      setReplyTo(reply ?? null);
+      alert(t.failedSendMessage ?? "Failed to send message. Please try again.");
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     }
-
-    setSending(false);
-    inputRef.current?.focus();
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
